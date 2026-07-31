@@ -140,4 +140,4 @@ support ticket:
 - [`audit-logging.md`](./audit-logging.md)
 - [`backup-disaster-recovery.md`](./backup-disaster-recovery.md)
 - [`security-standards.md`](./security-standards.md)
-- [`../architecture/multi-tenancy.md`](../architecture/multi-tenancy.md)
+- [`../architecture/single-tenant-deployment-model.md`](../architecture/single-tenant-deployment-model.md)

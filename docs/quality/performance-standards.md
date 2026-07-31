@@ -116,4 +116,4 @@ authenticated application shell and public marketing pages alike:
 - [`ci-cd-standards.md`](./ci-cd-standards.md)
 - [`definition-of-production-ready.md`](./definition-of-production-ready.md)
 - [`../architecture/caching-queues-events.md`](../architecture/caching-queues-events.md)
-- [`../architecture/multi-tenancy.md`](../architecture/multi-tenancy.md)
+- [`../architecture/single-tenant-deployment-model.md`](../architecture/single-tenant-deployment-model.md)

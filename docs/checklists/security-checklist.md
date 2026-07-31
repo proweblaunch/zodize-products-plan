@@ -37,8 +37,10 @@ mandatory sub-gate of
       covered by an automated test. There is no cross-tenant isolation test
       category — see
       [`../architecture/single-tenant-deployment-model.md`](../architecture/single-tenant-deployment-model.md#what-single-tenant-changes-in-the-data-model).
-- [ ] User impersonation, if used, writes a mandatory audit log entry on
-      start and end per [`../templates/admin-template.md`](../templates/admin-template.md).
+- [ ] Every admin-panel action that mutates data (settings change,
+      withdrawal approval, role change, KYC decision) writes a mandatory
+      audit log entry per
+      [`../templates/admin-template.md`](../templates/admin-template.md#audit-logging).
 
 ## Data protection
 
@@ -70,7 +72,7 @@ mandatory sub-gate of
 ## Audit and monitoring
 
 - [ ] Every sensitive action (auth events, permission changes, data export,
-      impersonation, billing changes) writes an audit log entry per
+      withdrawal approvals, admin settings changes) writes an audit log entry per
       [`../security/audit-logging.md`](../security/audit-logging.md).
 - [ ] Audit log entries are immutable and cannot be deleted or edited
       through any application code path.

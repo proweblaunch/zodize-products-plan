@@ -91,7 +91,7 @@ every item below.
 
 - [ ] Admin/back-office tooling live per
       [`../templates/admin-template.md`](../templates/admin-template.md),
-      including impersonation, feature flags, system health, and support tools.
+      including the inherited admin sections, feature flags, and system health.
 - [ ] Support team trained on the product with access to admin support tools.
 - [ ] Status page live and linked from the marketing site footer.
 - [ ] Escalation path documented for production incidents.
