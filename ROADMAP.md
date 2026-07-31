@@ -33,7 +33,9 @@ repository. New categories require an ADR (see `docs/decisions/`).
 | Coding Standards (Laravel, Vue), API/REST/Webhook/SDK Standards | Drafted |
 | Database, Migration, Seeder, Repository Pattern | Drafted |
 | Security, AuthN/AuthZ, RBAC, Audit Logs, Data Protection, DR | Drafted |
-| Multi-tenancy, Plugin & Marketplace Architecture | Drafted |
+| Base Codebase Strategy, Single-Tenant Deployment Model, Frontend–Backend Bridge, Product Genericization Checklist | Drafted |
+| Payment Gateways, Wallet/Ledger System, Admin Configuration Baseline | Drafted |
+| Plugin & Marketplace Architecture (per-product extension marketplace, not a cross-product platform) | Drafted |
 | CI/CD, Testing, Performance, Monitoring, Definition of Done/Production Ready | Drafted |
 | Git Workflow, PR Standards, Code Review, AI Coding Standards | Drafted |
 | Localization, Feature Flags, Environment & Release Standards | Drafted |
@@ -52,45 +54,71 @@ deltas, not a re-derivation.
 
 ## Phase 4 — Product Specifications
 
-**Status: Drafted — ZodiCore complete as reference; remaining 19 complete at
-foundation depth, queued for deep expansion**
+**Status: Drafted — every product's spec revised to the standalone,
+self-hosted architecture (see `docs/architecture/overview.md`); all 20
+complete at foundation depth, queued for deep expansion**
 
-`ZodiCore` is the reference-depth product specification: every section in
-"Product Specification Requirements" (vision through production checklist) is
-written out in full, because ZodiCore is the platform every other product is
-built on top of (identity, billing, tenancy, notifications, audit, plugin
-runtime). Every other product's spec currently covers vision, personas, market,
-architecture, modules, core data model, key workflows, integrations, and
-acceptance criteria in full — with database ER detail, exhaustive endpoint
-listings, and full report/chart catalogs queued as the next expansion pass,
-tracked per-product in each `docs/products/<product>/SPEC.md#roadmap` section.
+Every product's spec covers vision, personas, market, architecture (how it
+is built from the sanitized base codebase plus its own domain modules —
+see `docs/architecture/base-codebase-strategy.md`), modules, core data
+model, key workflows, integrations, and acceptance criteria in full — with
+database ER detail, exhaustive endpoint listings, and full report/chart
+catalogs queued as the next expansion pass, tracked per-product in each
+`docs/products/<product>/SPEC.md#roadmap` section. No product depends on
+another product or on a shared platform — each is fully standalone, per
+`docs/architecture/single-tenant-deployment-model.md`.
 
-### Product build order (dependency-driven, not alphabetical)
+### Product build order (complexity/risk-driven, not dependency-driven)
 
-1. **ZodiCore** — identity, tenancy, billing, notifications, plugin runtime. Every other product depends on this.
-2. **ZodiBusiness** — general SMB ERP (CRM, inventory, invoicing) — proves the module system.
-3. **ZodiCommerce** — storefront + order management — proves the marketplace/plugin system under load.
-4. **ZodiPOS** — point of sale — proves offline-first and hardware integration patterns.
-5. **ZodiTrack** — logistics/fleet-adjacent inventory tracking.
-6. **ZodiFleet** — fleet management.
-7. **ZodiEstate** — real estate management.
-8. **ZodiHotel** — hospitality/PMS.
-9. **ZodiMed** — healthcare/clinic management (highest compliance bar — HIPAA-equivalent).
-10. **ZodiCampus** — education/campus management.
-11. **ZodiLaw** — legal practice management.
-12. **ZodiBuild** — construction/project management.
-13. **ZodiAgro** — agriculture management.
-14. **ZodiGov** — government/public sector.
-15. **ZodiBank** — core banking (highest security bar).
-16. **ZodiTrade** — brokerage/trading.
-17. **ZodiXchange** — exchange infrastructure.
-18. **ZodiCapital** — investment/fund management.
-19. **ZodiYield** — yield/lending products.
-20. **ZodiReach** — marketing/outreach/CRM-adjacent.
+There is no cross-product dependency to sequence around — every product is
+independent. The build order below exists purely to manage complexity and
+risk, and its first entry is deliberately chosen to validate the shared
+**build pipeline** every subsequent product reuses: clone the sanitized base
+codebase → run the
+[genericization checklist](./docs/architecture/product-genericization-checklist.md) →
+wire the [frontend–backend bridge](./docs/architecture/frontend-backend-bridge.md) →
+layer on the product's own domain modules. Getting this pipeline right once,
+on the simplest product, is far cheaper than discovering a pipeline defect
+on the fourth or fifth product.
 
-Financial products (15–19) are sequenced last because they inherit the deepest
-security, audit, and compliance requirements from ZodiBank's spec, which itself
-extends every standard in `docs/security/`.
+1. **ZodiBusiness** — general SMB ERP (CRM, inventory, invoicing). Closest
+   fit to the base codebase's existing shape (users, wallet, plans), so it
+   validates the clone → genericize → bridge → extend pipeline with the
+   least new domain surface area, and is the reference example other
+   products follow for their own genericization pass.
+2. **ZodiCommerce** — storefront + order management — proves the plugin/
+   marketplace extension system (per-product, not cross-product) under a
+   catalog/inventory-heavy domain.
+3. **ZodiPOS** — point of sale — proves offline-first and hardware
+   integration patterns on top of the same base.
+4. **ZodiTrack** — logistics/fleet-adjacent inventory tracking.
+5. **ZodiFleet** — fleet management.
+6. **ZodiEstate** — real estate management.
+7. **ZodiHotel** — hospitality/PMS.
+8. **ZodiReach** — marketing/outreach/CRM-adjacent.
+9. **ZodiCore** — general-purpose ERP/back-office starter product (no longer
+   a shared platform — just the product whose domain surface is closest to
+   the base codebase as-is).
+10. **ZodiMed** — healthcare/clinic management (highest compliance bar —
+    HIPAA-equivalent).
+11. **ZodiCampus** — education/campus management.
+12. **ZodiLaw** — legal practice management.
+13. **ZodiBuild** — construction/project management.
+14. **ZodiAgro** — agriculture management.
+15. **ZodiGov** — government/public sector.
+16. **ZodiBank** — core banking (highest security bar; re-adds the
+    loan/DPS/FDR domain modules the genericization checklist strips from
+    every other product).
+17. **ZodiTrade** — brokerage/trading.
+18. **ZodiXchange** — exchange infrastructure.
+19. **ZodiCapital** — investment/fund management.
+20. **ZodiYield** — yield/lending products.
+
+Financial products (16–20) are sequenced last because they carry the deepest
+security, audit, and compliance requirements, and because several of them
+(ZodiXchange, ZodiTrade, ZodiBank) require the multi-currency wallet
+extension documented in `docs/decisions/0002-single-currency-wallet-by-default.md` —
+best tackled once the base pipeline is well-proven on simpler products.
 
 ## Non-goals for this phase
 

@@ -1,11 +1,15 @@
 # Zodize Product Catalog
 
 Every Zodize product, its one-line pitch, primary market, and spec status.
-Full specification lives at `docs/products/<name>/SPEC.md`.
+Full specification lives at `docs/products/<name>/SPEC.md`. Every product is
+sold as **standalone, self-hosted source code** — see
+[`docs/architecture/overview.md`](./docs/architecture/overview.md) — not as
+a hosted service, and each is fully independent (no product depends on
+another being deployed or reachable).
 
 | Product | Pitch | Primary Industry | Spec Status |
 |---|---|---|---|
-| [ZodiCore](./docs/products/ZodiCore/SPEC.md) | The identity, tenancy, billing, and plugin runtime every Zodize product is built on | Platform / Internal | Reference-depth |
+| [ZodiCore](./docs/products/ZodiCore/SPEC.md) | General-purpose back-office/ERP starter product | ERP / General Business | Foundation |
 | [ZodiBank](./docs/products/ZodiBank/SPEC.md) | Core banking platform for digital-first banks and credit unions | Banking | Foundation |
 | [ZodiTrade](./docs/products/ZodiTrade/SPEC.md) | Multi-asset brokerage and trading platform | Capital Markets | Foundation |
 | [ZodiXchange](./docs/products/ZodiXchange/SPEC.md) | Exchange infrastructure for spot and derivatives markets | Capital Markets | Foundation |
@@ -30,20 +34,31 @@ Full specification lives at `docs/products/<name>/SPEC.md`.
 
 - **Reference-depth**: every section of the product specification requirements
   (vision through production checklist) is written to full implementation
-  detail, including complete ER diagrams and endpoint catalogs. Used as the
-  template other specs are measured against.
-- **Foundation**: vision, market, personas, architecture, modules, core data
-  model, key workflows, integrations, permissions model, and acceptance
-  criteria are complete and implementation-usable. Deep artifacts (full ER
-  diagrams, exhaustive endpoint listings, full report catalogs) are queued and
-  tracked in the product's own roadmap section.
-- **Deep**: matches ZodiCore's level of detail.
+  detail, including complete ER diagrams and endpoint catalogs.
+- **Foundation**: vision, market, personas, architecture (how the product is
+  built from the sanitized base codebase per
+  [`docs/architecture/base-codebase-strategy.md`](./docs/architecture/base-codebase-strategy.md)
+  plus its own domain modules), modules, core data model, key workflows,
+  integrations, permissions model, and acceptance criteria are complete and
+  implementation-usable. Deep artifacts (full ER diagrams, exhaustive
+  endpoint listings, full report catalogs) are queued and tracked in the
+  product's own roadmap section.
+- **Deep**: reference-depth detail plus full ER diagrams and endpoint
+  catalogs, without yet being frozen for a release.
 - **Locked**: reviewed and frozen for a release; changes require an ADR.
 
-## Cross-cutting platform
+## Every product is independent
 
-Every product listed above is a tenant application running on **ZodiCore**.
-None of them re-implement authentication, billing, notifications, or the
-plugin runtime — they consume ZodiCore's services and extend them with
-domain-specific modules. See `docs/architecture/multi-tenancy.md` and
-`docs/architecture/plugin-architecture.md`.
+Every product listed above is its own standalone, single-tenant Laravel
+application (see
+[`docs/architecture/single-tenant-deployment-model.md`](./docs/architecture/single-tenant-deployment-model.md)),
+cloned and genericized from one shared, audited base codebase (see
+[`docs/architecture/base-codebase-strategy.md`](./docs/architecture/base-codebase-strategy.md))
+and the shared Zodize frontend design system, then extended with its own
+domain modules per
+[`docs/architecture/product-genericization-checklist.md`](./docs/architecture/product-genericization-checklist.md).
+No product depends on another product, or on any Zodize-operated central
+service, being deployed or reachable at runtime. `ZodiCore` is not a shared
+platform the other nineteen depend on — it is its own sellable product (a
+general-purpose ERP/back-office starter), listed here on equal footing with
+every other product.
