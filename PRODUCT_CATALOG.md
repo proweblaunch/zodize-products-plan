@@ -18,7 +18,7 @@ another being deployed or reachable).
 | [ZodiCampus](./docs/products/ZodiCampus/SPEC.md) | Campus and student information system | Education | Foundation |
 | [ZodiCommerce](./docs/products/ZodiCommerce/SPEC.md) | Enterprise storefront and order management | Retail / E-commerce | Foundation |
 | [ZodiBusiness](./docs/products/ZodiBusiness/SPEC.md) | SMB ERP: CRM, inventory, invoicing, accounting | SMB / General | Foundation |
-| [ZodiTrack](./docs/products/ZodiTrack/SPEC.md) | Asset and inventory tracking across locations | Logistics | Foundation |
+| [ZodiTrack](./docs/products/ZodiTrack/SPEC.md) | Asset and inventory tracking across locations | Logistics | Live — Extend Only |
 | [ZodiCapital](./docs/products/ZodiCapital/SPEC.md) | Fund and investment portfolio management | Asset Management | Foundation |
 | [ZodiYield](./docs/products/ZodiYield/SPEC.md) | Lending, credit, and yield product management | Fintech Lending | Foundation |
 | [ZodiReach](./docs/products/ZodiReach/SPEC.md) | Marketing automation and omnichannel outreach | Marketing | Foundation |
@@ -46,6 +46,15 @@ another being deployed or reachable).
 - **Deep**: reference-depth detail plus full ER diagrams and endpoint
   catalogs, without yet being frozen for a release.
 - **Locked**: reviewed and frozen for a release; changes require an ADR.
+- **Live — Extend Only**: the product already exists as a complete, working
+  codebase currently being resold to real buyers, independent of this
+  handbook's build pipeline. It is never cloned, re-scaffolded, or built
+  from the sanitized base codebase, and never subject to destructive setup
+  (fresh migrations, dependency reinstall-from-scratch). The only allowed
+  workflow is auditing the live codebase against its `SPEC.md`, producing a
+  gap list, and adding purely additive features via normal, rollback-safe
+  migrations — see [`BUILD_STATE.md`](./BUILD_STATE.md)'s protocol for
+  `Live — Extend Only` products.
 
 ## Every product is independent
 
@@ -61,4 +70,6 @@ No product depends on another product, or on any Zodize-operated central
 service, being deployed or reachable at runtime. `ZodiCore` is not a shared
 platform the other nineteen depend on — it is its own sellable product (a
 general-purpose ERP/back-office starter), listed here on equal footing with
-every other product.
+every other product. `ZodiTrack` is the one exception to the
+clone-from-base build pipeline described above — it is already live and
+independently built; see its `Live — Extend Only` status.

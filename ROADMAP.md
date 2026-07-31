@@ -68,6 +68,15 @@ catalogs queued as the next expansion pass, tracked per-product in each
 another product or on a shared platform — each is fully standalone, per
 `docs/architecture/single-tenant-deployment-model.md`.
 
+**This Foundation depth is sufficient to begin implementation.** Full ER
+diagrams and an exhaustive endpoint catalog (the depth ZodiCore alone
+currently has) are not a prerequisite for starting a product's build — they
+are a **GA gate** requirement (before that product is sold to real buyers),
+per `docs/checklists/production-readiness-checklist.md`. Deep artifacts are
+written just-in-time, one module at a time, as that module is actually
+implemented — not as a blanket prerequisite that blocks every other
+product from starting until ZodiCore-level depth is reached everywhere.
+
 ### Product build order (complexity/risk-driven, not dependency-driven)
 
 There is no cross-product dependency to sequence around — every product is
@@ -81,6 +90,12 @@ layer on the product's own domain modules. Getting this pipeline right once,
 on the simplest product, is far cheaper than discovering a pipeline defect
 on the fourth or fifth product.
 
+> **ZodiTrack is excluded from this build-from-scratch queue.** It already
+> exists as a complete, working, currently-resold product — see
+> `PRODUCT_CATALOG.md`'s `Live — Extend Only` status and `BUILD_STATE.md`
+> for its audit-driven gap-fill queue. Nothing below applies to it: it is
+> never cloned, re-scaffolded, or built fresh.
+
 1. **ZodiBusiness** — general SMB ERP (CRM, inventory, invoicing). Closest
    fit to the base codebase's existing shape (users, wallet, plans), so it
    validates the clone → genericize → bridge → extend pipeline with the
@@ -91,30 +106,29 @@ on the fourth or fifth product.
    catalog/inventory-heavy domain.
 3. **ZodiPOS** — point of sale — proves offline-first and hardware
    integration patterns on top of the same base.
-4. **ZodiTrack** — logistics/fleet-adjacent inventory tracking.
-5. **ZodiFleet** — fleet management.
-6. **ZodiEstate** — real estate management.
-7. **ZodiHotel** — hospitality/PMS.
-8. **ZodiReach** — marketing/outreach/CRM-adjacent.
-9. **ZodiCore** — general-purpose ERP/back-office starter product (no longer
+4. **ZodiFleet** — fleet management.
+5. **ZodiEstate** — real estate management.
+6. **ZodiHotel** — hospitality/PMS.
+7. **ZodiReach** — marketing/outreach/CRM-adjacent.
+8. **ZodiCore** — general-purpose ERP/back-office starter product (no longer
    a shared platform — just the product whose domain surface is closest to
    the base codebase as-is).
-10. **ZodiMed** — healthcare/clinic management (highest compliance bar —
+9. **ZodiMed** — healthcare/clinic management (highest compliance bar —
     HIPAA-equivalent).
-11. **ZodiCampus** — education/campus management.
-12. **ZodiLaw** — legal practice management.
-13. **ZodiBuild** — construction/project management.
-14. **ZodiAgro** — agriculture management.
-15. **ZodiGov** — government/public sector.
-16. **ZodiBank** — core banking (highest security bar; re-adds the
+10. **ZodiCampus** — education/campus management.
+11. **ZodiLaw** — legal practice management.
+12. **ZodiBuild** — construction/project management.
+13. **ZodiAgro** — agriculture management.
+14. **ZodiGov** — government/public sector.
+15. **ZodiBank** — core banking (highest security bar; re-adds the
     loan/DPS/FDR domain modules the genericization checklist strips from
     every other product).
-17. **ZodiTrade** — brokerage/trading.
-18. **ZodiXchange** — exchange infrastructure.
-19. **ZodiCapital** — investment/fund management.
-20. **ZodiYield** — yield/lending products.
+16. **ZodiTrade** — brokerage/trading.
+17. **ZodiXchange** — exchange infrastructure.
+18. **ZodiCapital** — investment/fund management.
+19. **ZodiYield** — yield/lending products.
 
-Financial products (16–20) are sequenced last because they carry the deepest
+Financial products (15–19) are sequenced last because they carry the deepest
 security, audit, and compliance requirements, and because several of them
 (ZodiXchange, ZodiTrade, ZodiBank) require the multi-currency wallet
 extension documented in `docs/decisions/0002-single-currency-wallet-by-default.md` —
@@ -122,10 +136,20 @@ best tackled once the base pipeline is well-proven on simpler products.
 
 ## Non-goals for this phase
 
-- No product source code, no Laravel projects, no scaffolding commands are run
-  from this repository. This repository is documentation and specification only.
-- No product begins implementation until its spec passes the
-  `docs/checklists/production-readiness-checklist.md` "spec complete" gate.
+- This repository stays documentation and specification only — no product
+  source code, no Laravel projects, and no scaffolding commands are ever
+  run *from* this repository. It is, however, the authoritative blueprint
+  Claude Code (or any engineer) executes *against* when building each
+  product's actual codebase at the working-directory convention in
+  `docs/architecture/deployment-paths.md`
+  (`/home/script/public_html/<product-slug>/`), tracked via
+  `BUILD_STATE.md`. The repository documents; the build happens elsewhere,
+  guided entirely by what's documented here.
+- No product begins implementation until its spec passes the "Spec
+  Complete" gate in `docs/checklists/production-readiness-checklist.md` —
+  satisfiable at **Foundation** depth (see Phase 4 below); full ER
+  diagrams and exhaustive endpoint catalogs are a **GA gate** requirement,
+  not an implementation-start requirement.
 
 ## How to propose a roadmap change
 

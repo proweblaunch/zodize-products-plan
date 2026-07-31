@@ -12,13 +12,23 @@ is no partial credit.
 
 Per [`../../ROADMAP.md`](../../ROADMAP.md) Phase 4, no product's
 implementation begins until its `docs/products/<product>/SPEC.md` passes
-every item below.
+every item below. This gate is satisfiable at **Foundation** depth per
+[`../../PRODUCT_CATALOG.md`](../../PRODUCT_CATALOG.md)'s spec status
+definitions — it does **not** require ZodiCore-level Reference/Deep depth.
+Full ER diagrams and an exhaustive endpoint catalog are explicitly **not**
+required here; see the GA gate's "Deep artifacts" item below for when those
+are required, and note they are written just-in-time per module as that
+module is actually implemented, not produced as a blanket prerequisite
+before any code is written.
 
 - [ ] Vision and target market documented.
 - [ ] Primary personas documented, each with goals and pain points.
 - [ ] Competitive positioning documented.
-- [ ] Full data model with ER relationships documented, extending
-      [`../templates/database-template.md`](../templates/database-template.md).
+- [ ] Core data model documented (the product's key entities and their
+      relationships, at the depth every current product spec's "Core Data
+      Model" section already provides), extending
+      [`../templates/database-template.md`](../templates/database-template.md) —
+      a full ER diagram is not required at this gate.
 - [ ] Every module the product ships is enumerated, each mapped to
       [`../templates/module-template.md`](../templates/module-template.md).
 - [ ] Core user workflows documented end-to-end (not just feature lists).
@@ -86,6 +96,14 @@ every item below.
       [`../templates/marketing-website-template.md`](../templates/marketing-website-template.md).
 - [ ] `docs/products/<product>/SPEC.md` is current with the shipped product
       (no drift between spec and implementation).
+- [ ] **Deep artifacts complete (GA gate only, not required to start
+      implementation)**: a full ER diagram covering every implemented table
+      and relationship, an exhaustive endpoint catalog matching the shipped
+      OpenAPI spec, and a full report/chart catalog for every implemented
+      dashboard/report. These are written module-by-module as implementation
+      proceeds — per [`../../ROADMAP.md`](../../ROADMAP.md) Phase 4 — and
+      this item verifies they are complete and drift-free by GA, not that
+      they existed before the first line of code was written.
 
 ## Support
 
