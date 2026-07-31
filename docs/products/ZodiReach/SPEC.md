@@ -45,8 +45,8 @@ data and [ZodiBusiness](../ZodiBusiness/SPEC.md) CRM contacts.
 | Capability | Comparable to | Zodize differentiation |
 |---|---|---|
 | Email/SMS marketing automation | Klaviyo, Iterable | Native access to ZodiCommerce order/customer data, no data-sync connector required |
-| Enterprise marketing automation | HubSpot Marketing Hub, Marketo | Segmentation and consent share ZodiCore's tenant/RBAC model instead of a separate marketing-cloud login |
-| Transactional + marketing send infrastructure | Braze | One notification fabric (ZodiCore's) powers both product notifications and marketing sends, avoiding duplicate infrastructure |
+| Enterprise marketing automation | HubSpot Marketing Hub, Marketo | Segmentation and consent share the product's own inherited RBAC model instead of a separate marketing-cloud login |
+| Transactional + marketing send infrastructure | Braze | One notification fabric, inherited from the base codebase, powers both product notifications and marketing sends within this one deployment, avoiding duplicate infrastructure |
 | Deliverability/reputation management | SendGrid/Twilio SendGrid deliverability tooling | Sender reputation monitoring built into the campaign send pipeline, not a bolt-on dashboard |
 | A/B testing and attribution | Mailchimp, Braze experimentation | Attribution ties directly to ZodiCommerce order records for real revenue attribution, not just click-through proxies |
 
