@@ -172,20 +172,38 @@ inherited baseline. ZodiXchange-specific additions:
 
 ## 11. Architecture
 
-ZodiXchange is a Laravel application consuming ZodiCore's identity,
-tenancy, billing, notification, RBAC, plugin, and audit packages exactly as
-described in [ZodiCore §11](../ZodiCore/SPEC.md#11-architecture), with one
-deliberate exception: the matching engine itself runs as a dedicated,
-in-memory, low-latency service per market/symbol (outside the request-
-response Laravel app) that publishes order-book and execution events onto
-the platform's event bus (per
+ZodiXchange is built by cloning the sanitized
+[base codebase](../../architecture/base-codebase-strategy.md) — a single,
+independent Laravel application the buyer deploys entirely on their own
+shared/VPS hosting (or a larger dedicated/VPS host where matching-engine
+throughput requires it), per
+[single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md).
+Building ZodiXchange means running the full
+[genericization checklist](../../architecture/product-genericization-checklist.md):
+the inherited `loans`/`dps`/`fdr`/`branches`/`other_banks` tables and
+controllers are stripped (they do not apply to an exchange), and ZodiXchange
+keeps and builds on top of the base engine's RBAC/auth (`Role`/`Permission`
+models), KYC, i18n, and admin configuration surface (see
+[base-codebase-strategy.md](../../architecture/base-codebase-strategy.md#inherited-as-is-the-admin-engine-every-product-keeps)).
+Because ZodiXchange needs multi-asset custody balances rather than a
+single-currency wallet, it extends the inherited wallet engine's pattern per
+§14 with its own `custody_balances` table rather than using `User.balance`.
+
+On that foundation, ZodiXchange makes one deliberate architectural
+exception: the matching engine itself runs as a dedicated, in-memory,
+low-latency service per market/symbol (outside the request-response Laravel
+app) that publishes order-book and execution events onto the application's
+event bus (per
 [caching-queues-events.md](../../architecture/caching-queues-events.md))
 for the Laravel app to persist, audit, and expose via API/WebSocket. This
-keeps ZodiCore's identity/audit/RBAC guarantees intact for every account
-and order action while not forcing matching-engine-critical-path latency
+keeps the inherited RBAC/audit guarantees intact for every account and
+order action while not forcing matching-engine-critical-path latency
 through a general-purpose web framework request cycle. Custody/wallet
 integration and settlement run behind a `CustodyLedgerContract` supporting
-both custodial and on-chain settlement models.
+both custodial and on-chain settlement models. ZodiXchange has no runtime
+dependency on any other Zodize product or on a Zodize-operated central
+service; the only external dependencies are the third-party custody, KYC,
+and clearing integrations the buyer's own venue configures (§22).
 
 ## 12. Technology
 
@@ -216,15 +234,18 @@ WebSocket/FIX-style gateway for LP and institutional trading connectivity.
 ## 14. Core Data Model
 
 The 12 entities below are the load-bearing core; full ER diagram is queued
-(see [Roadmap (spec depth)](#roadmap-spec-depth)).
+(see [Roadmap (spec depth)](#roadmap-spec-depth)). There is no `tenant_id`
+column anywhere in this model — each deployed instance belongs to exactly
+one exchange operator, per
+[single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md#what-single-tenant-changes-in-the-data-model).
 
 | Entity | Key columns |
 |---|---|
-| `markets` | id, tenant_id, symbol, asset_class, tick_size, lot_size, status |
+| `markets` | id, symbol, asset_class, tick_size, lot_size, status |
 | `orders` | id, account_id, market_id, side, order_type, quantity, price, hidden_quantity, status |
 | `trades` | id, market_id, buy_order_id, sell_order_id, price, quantity, executed_at |
 | `order_book_snapshots` | id, market_id, sequence_number, captured_at, depth_json |
-| `fee_schedules` | id, tenant_id, market_id, tier, maker_bps, taker_bps, effective_at |
+| `fee_schedules` | id, market_id, tier, maker_bps, taker_bps, effective_at |
 | `custody_balances` | id, account_id, asset, available_balance, held_balance, updated_at |
 | `settlements` | id, trade_id, settlement_model, status, settled_at |
 | `liquidity_providers` | id, account_id, status, quoting_permissions, rebate_tier, onboarded_at |
@@ -232,6 +253,22 @@ The 12 entities below are the load-bearing core; full ER diagram is queued
 | `trading_halts` | id, market_id, reason, initiated_by, initiated_at, resumed_at |
 | `market_makers_quotes` | id, liquidity_provider_id, market_id, bid_price, ask_price, updated_at |
 | `symbol_reference_data` | id, market_id, description, underlying_asset, contract_spec_json |
+
+**Multi-asset custody balances**: ZodiXchange genuinely needs an account to
+hold balances in multiple tradable assets/currencies simultaneously — this
+is the exchange's fundamental reason for existing. Per
+[ADR-0002](../../decisions/0002-single-currency-wallet-by-default.md), the
+inherited single-currency `User.balance`/`Transaction` engine is not
+extended globally; `custody_balances` above already implements the required
+extension pattern from
+[wallet-system.md's Multi-currency gap](../../standards/wallet-system.md#multi-currency-gap)
+— `asset` is ZodiXchange's `currency`-equivalent column, and the table is
+scoped per `account_id` rather than per `User.balance`. The corresponding
+append-only, post-balance-snapshot ledger row is `custody_ledger_entries`
+(`id`, `custody_balance_id`, `amount` (signed), `asset`, `trigger`
+(trade_settlement/deposit/withdrawal/fee), `post_balance_snapshot`,
+`reference_trade_id`, `created_at`), mirroring the inherited `Transaction`
+model's invariants rather than the shared base engine's schema itself.
 
 ## 15. Key API Endpoints
 

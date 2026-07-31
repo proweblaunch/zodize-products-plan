@@ -371,16 +371,16 @@ consent record relied upon, supporting FERPA-equivalent recordkeeping.
   exchange networks (Parchment/National Student Clearinghouse-class) for
   inbound prior-institution transcripts and outbound official transcript
   delivery.
-- **Payment processing**: tuition and payment-plan processing via
-  ZodiCore's payment gateway abstraction.
+- **Payment processing**: tuition and payment-plan processing via the
+  inherited base codebase's payment gateway abstraction.
 - **Financial aid systems**: federal/state aid system integration for
-  higher-education tenants (e.g. FAFSA-adjacent data exchange where
-  applicable to the tenant's jurisdiction).
+  higher-education institutions (e.g. FAFSA-adjacent data exchange where
+  applicable to the institution's jurisdiction).
 - **LMS integration**: grade passback and roster sync with common learning
-  management systems (Canvas/Moodle-class) for tenants running a separate
-  LMS alongside ZodiCampus.
+  management systems (Canvas/Moodle-class) for institutions running a
+  separate LMS alongside ZodiCampus.
 - **SIS data exchange**: standard education data interchange formats for
-  district/network-level reporting (K-12 tenants).
+  district/network-level reporting (K-12 school networks).
 
 ## 23. AI Features
 
@@ -390,9 +390,9 @@ consent record relied upon, supporting FERPA-equivalent recordkeeping.
 - AI-assisted transcript/document review during admissions, extracting
   structured data (courses, grades) from uploaded transcripts for
   Admissions Officer review — never an auto-decision.
-- Anomaly detection on grade-change and access-record patterns, extending
-  ZodiCore's audit anomaly detection
-  (§23 of [ZodiCore's SPEC.md](../ZodiCore/SPEC.md#23-ai-features)).
+- Anomaly detection on grade-change and access-record patterns, built on
+  ZodiCampus's own audit log data per
+  [audit-logging.md](../../security/audit-logging.md).
 
 ## 24. Automation, Scheduled Jobs, CLI Commands
 
@@ -433,12 +433,13 @@ applies. ZodiCampus-specific requirements (FERPA-equivalent):
   minor, or explicit consent for an adult student) is denied and logged as
   a denied attempt.
 - **Directory information handling**: fields designated as directory
-  information are configurable per tenant policy and excludable per
-  student opt-out, distinct from the broader consent-gated record set.
+  information are configurable per the institution's own policy and
+  excludable per student opt-out, distinct from the broader consent-gated
+  record set.
 - **Data segregation for third-party requesters**: transcript/record
   requests from third parties (e.g. another institution) require the same
   consent basis as guardian access and are logged identically.
-- **Retention and disposal**: student records follow the tenant's
+- **Retention and disposal**: student records follow the institution's
   configured retention policy per
   [data-protection-privacy.md](../../security/data-protection-privacy.md),
   respecting jurisdiction-specific minimum retention for academic records.
@@ -484,13 +485,13 @@ See [production-readiness-checklist.md](../../checklists/production-readiness-ch
 
 ## 33. Known Risks
 
-- FERPA consent-scoping defects carry direct legal exposure for education
-  tenants — mitigated by the dedicated access-control test suite in §28,
-  but this remains the module requiring the most conservative change-review
-  process.
+- FERPA consent-scoping defects carry direct legal exposure for the schools
+  and institutions running this product — mitigated by the dedicated
+  access-control test suite in §28, but this remains the module requiring
+  the most conservative change-review process.
 - Registration-window concurrency is a recurring real-world failure point
   for SIS platforms (overbooking, race conditions) — mitigated by
-  row-level locking per §12, but load testing ahead of each tenant's
+  row-level locking per §12, but load testing ahead of each deployment's
   registration windows remains an operational requirement.
 
 ## 34. Future Improvements
@@ -500,7 +501,12 @@ See [production-readiness-checklist.md](../../checklists/production-readiness-ch
 
 ## Roadmap (spec depth)
 
-This spec is Foundation-depth. Queued for Deep-depth expansion: full ER
-diagram and migration set (companion `DATA_MODEL.md`), full endpoint
-catalog (companion `API_REFERENCE.md`), full degree-audit rule engine
-design, and a complete report catalog beyond the summary list in §21.
+This spec is Foundation-depth. Its Architecture (§11), Core Data Model
+(§14), and Permissions & Roles (§18) sections were revised to the
+standalone, self-hosted, single-tenant model in
+[single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md);
+no product-domain content (vision, personas, journeys, academic/billing
+workflows) changed. Queued for Deep-depth expansion: full ER diagram and
+migration set (companion `DATA_MODEL.md`), full endpoint catalog (companion
+`API_REFERENCE.md`), full degree-audit rule engine design, and a complete
+report catalog beyond the summary list in §21.

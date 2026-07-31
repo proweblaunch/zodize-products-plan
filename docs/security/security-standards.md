@@ -9,11 +9,14 @@
 ## Scope
 
 This document is the floor. It applies to every Laravel service and Vue
-frontend in every Zodize product, to ZodiCore itself, and to every plugin
+frontend in every Zodize product — including `ZodiCore`, itself one of the
+twenty sellable products, not a shared platform — and to every plugin
 distributed through the marketplace (see
 [`../architecture/marketplace-architecture.md`](../architecture/marketplace-architecture.md)).
-It is written against the shared stack described in
-[`../architecture/overview.md`](../architecture/overview.md).
+It is written against the shared base codebase and single-tenant deployment
+model described in
+[`../architecture/overview.md`](../architecture/overview.md) and
+[`../architecture/single-tenant-deployment-model.md`](../architecture/single-tenant-deployment-model.md).
 
 ## OWASP Top 10 mapping
 

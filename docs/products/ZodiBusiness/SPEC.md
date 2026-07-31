@@ -136,30 +136,58 @@ ZodiBusiness-specific additions:
 
 ## 11. Architecture
 
-ZodiBusiness is a tenant application on [ZodiCore](../ZodiCore/SPEC.md),
-consuming identity, permissions, billing (for the SMB's own subscription),
-and notifications via the shared Composer packages per
-[architecture/overview.md](../../architecture/overview.md). CRM, inventory,
-and accounting are distinct modules within the same modular monolith sharing
-one Postgres schema per tenant, deliberately avoiding a microservice split
-between "CRM" and "accounting" because the quote-to-cash flow requires
-strict transactional consistency between them (a paid invoice and its
-journal entry must commit together). Multi-company/multi-branch support
-follows [multi-tenancy.md](../../architecture/multi-tenancy.md), letting a
-single SMB tenant operate multiple legal entities with consolidated and
-per-entity reporting.
+ZodiBusiness — the first product in the build order
+([ROADMAP.md](../../../ROADMAP.md)) — is built by cloning the sanitized base
+codebase and running the
+[genericization checklist](../../architecture/product-genericization-checklist.md).
+Because ZodiBusiness's own shape (users, wallet, plans, accounting-adjacent
+records) is the closest fit to the base codebase as audited, this clone is
+the reference example every other product's genericization pass follows: the
+banking-specific `loans`/`dps`/`fdr`/`branches`/`branch_staff`/
+`other_banks`/`beneficiaries`/`airtime` tables are stripped (none of them
+serve an SMB CRM/inventory/accounting product), and the `branch_staff` guard
+is dropped by default, per
+[product-genericization-checklist.md](../../architecture/product-genericization-checklist.md#step-2--strip-banking-domain-specific-tables-models-and-controllers).
+ZodiBusiness inherits the base engine's wallet/ledger, payment gateways
+(§22), RBAC/auth, KYC, i18n, and admin configuration surface unmodified —
+see
+[base-codebase-strategy.md](../../architecture/base-codebase-strategy.md) —
+and layers its own CRM, Inventory, Sales, Expenses, Accounting, and
+Procurement modules (§13) on top, per
+[base-codebase-strategy.md](../../architecture/base-codebase-strategy.md#layering-a-products-domain-modules-onto-the-sanitized-base).
+
+CRM, inventory, and accounting are distinct modules within the same modular
+monolith and the same one database of the buyer's single deployment —
+deliberately avoiding a microservice split between "CRM" and "accounting"
+because the quote-to-cash flow requires strict transactional consistency
+between them (a paid invoice and its journal entry must commit together in
+one Laravel database transaction), per
+[overview.md](../../architecture/overview.md#modular-monolith-one-codebase-per-product).
+There is no shared tenant boundary and no ZodiCore platform dependency: each
+ZodiBusiness deployment is one SMB's standalone, self-hosted instance, per
+[single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md).
+Multi-company/multi-branch support — letting a single SMB operate multiple
+legal entities with consolidated and per-entity reporting — is scoping
+within this one deployment, via the `company_id`/`branch_id` model in §14,
+per
+[localization-i18n.md](../../standards/localization-i18n.md#multi-company--multi-branch-data-scoping),
+never tenancy.
 
 ## 12. Technology
 
-Laravel (PHP) + Vue per
-[coding-standards-php-laravel.md](../../development/coding-standards-php-laravel.md)
-and [coding-standards-vue.md](../../development/coding-standards-vue.md);
-PostgreSQL + Redis per
+Laravel (PHP) per the base codebase's stack (Laravel 11, PHP ^8.3, Vite 5) —
+see
+[base-codebase-strategy.md](../../architecture/base-codebase-strategy.md) —
+following
+[coding-standards-php-laravel.md](../../development/coding-standards-php-laravel.md);
+MySQL/MariaDB + Redis (where the buyer's hosting supports it, with a file/DB
+cache fallback) per
 [database-standards.md](../../development/database-standards.md); a
 dedicated append-only `journal_entries` ledger table enforced at the
 database layer to be immutable once posted (corrections via reversing entry,
-never edited in place, mirroring [ZodiCore §20](../ZodiCore/SPEC.md#20-payment-gateways-wallet-accounting-taxes-invoices)'s
-invoice-immutability pattern).
+never edited in place), mirroring the inherited wallet engine's own
+append-only `Transaction` pattern documented in
+[wallet-system.md](../../standards/wallet-system.md).
 
 ## 13. Modules & Submodules
 

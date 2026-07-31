@@ -236,13 +236,19 @@ lists, and safety incidents.
 
 ## 14. Core Data Model
 
+All tables belong to the one buyer's one deployment — there is no
+`tenant_id` column anywhere in this model
+([single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md)).
+Subcontractor collaborator access is scoped by the `project_subcontractors`
+join table, not by a separate tenant construct.
+
 | Entity | Key columns | Notes |
 |---|---|---|
-| `projects` | id, tenant_id, name, status, original_budget, start_date, target_completion | Core project record |
+| `projects` | id, name, status, original_budget, start_date, target_completion | Core project record |
 | `project_phases` | id, project_id, name, sequence, status, start_date, end_date | Schedule phases/milestones |
 | `cost_codes` | id, project_id, code, description, budget_amount | Budget line-item structure |
 | `budget_actuals` | id, cost_code_id, committed_amount, actual_amount, recorded_at | Committed vs. actual roll-up |
-| `subcontractors` | id, tenant_id, company_name, trade, contact_info | Directory entity, reused across projects |
+| `subcontractors` | id, company_name, trade, contact_info | Directory entity, reused across projects |
 | `project_subcontractors` | id, project_id, subcontractor_id, contract_value, status | Contract linkage per project |
 | `compliance_documents` | id, subcontractor_id, doc_type, expires_at, file_ref | Insurance/licensing tracking |
 | `rfis` | id, project_id, number, subject, drawing_ref, status, due_date, submitted_by | Request for information |
@@ -309,8 +315,8 @@ All channels follow
 
 ## 18. Permissions & Roles
 
-Inherits ZodiCore default roles
-([rbac-permissions.md](../../security/rbac-permissions.md#default-system-roles))
+Inherits the base codebase's default admin roles
+([rbac-permissions.md](../../security/rbac-permissions.md#default-system-roles)),
 scoped per project. ZodiBuild-specific permissions: `projects.manage`,
 `budget.manage`, `rfis.manage`, `submittals.review` (Architect-scoped),
 `change_orders.approve_internal`, `change_orders.approve_client` (Owner's
@@ -340,8 +346,8 @@ subcontractor's data.
 
 Every budget change, RFI response, submittal review decision, change order
 approval step, punch item status change, and drawing version supersession
-is recorded to the ZodiCore audit log with actor, timestamp, before/after
-values, and project scope — per
+is recorded to the deployment's audit log with actor, timestamp,
+before/after values, and project scope — per
 [audit-logging.md](../../security/audit-logging.md). Submittals and
 drawings additionally carry a complete, immutable version chain distinct
 from general audit history, since it is the record of what was actually
@@ -417,8 +423,12 @@ displaying the first sheet in under 3 seconds via progressive load.
 Full baseline from [security-standards.md](../../security/security-standards.md)
 applies. Subcontractor external-collaborator access is strictly scoped to
 their own project and their own submitted/assigned records, verified by a
-dedicated cross-subcontractor isolation test (parallel to ZodiCore's
-cross-tenant isolation suite), per
+dedicated cross-subcontractor authorization test suite covering every
+policy that gates project, RFI, submittal, and punch-item access (this is
+row-level authorization within one deployment, not the tenant-isolation
+category described in
+[single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md#what-single-tenant-changes-in-the-data-model)),
+per
 [data-protection-privacy.md](../../security/data-protection-privacy.md).
 Drawing/submittal version history is immutable — corrections are new
 versions, never edits to a prior version.
@@ -456,8 +466,8 @@ RFI/submittal/daily-log responsiveness.
 See
 [production-readiness-checklist.md](../../checklists/production-readiness-checklist.md).
 ZodiBuild additionally requires sign-off that the subcontractor
-cross-isolation test suite passes before any tenant is allowed to invite
-external subcontractor collaborators in production.
+cross-isolation test suite passes before a buyer's deployment is allowed to
+invite external subcontractor collaborators in production.
 
 ## 32. Future Roadmap
 
