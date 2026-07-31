@@ -8,9 +8,18 @@
 > this document. See [PRODUCT_CATALOG.md](../../../PRODUCT_CATALOG.md) for
 > spec status definitions.
 
-Built on [ZodiCore](../ZodiCore/SPEC.md) — ZodiXchange does not reimplement
-identity, tenancy, billing, notifications, RBAC, plugins, or audit logging;
-it consumes those services and adds exchange-domain modules on top.
+ZodiXchange is a standalone, self-hosted Laravel application built by
+cloning the sanitized [base codebase](../../architecture/base-codebase-strategy.md),
+running the
+[genericization checklist](../../architecture/product-genericization-checklist.md)
+to strip the base engine's banking-specific loan/DPS/FDR/branch tables, and
+layering exchange-domain modules on top. It does not depend on any other
+Zodize product or on a central "ZodiCore" platform for identity, billing,
+notifications, or tenancy — see
+[single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md).
+`ZodiCore` is itself just another standalone product in the catalog (a
+general-purpose back-office/ERP starter), not a platform ZodiXchange runs
+on.
 
 ## 1. Vision
 
@@ -26,10 +35,10 @@ defensible trading venue from day one.
 Standing up exchange infrastructure today typically means building a
 matching engine from scratch or licensing one in isolation from custody,
 surveillance, and liquidity-provider tooling. ZodiXchange exists to give an
-exchange operator a coherent venue platform — matching, custody
-integration, LP connectivity, and surveillance — built on ZodiCore's
-identity and audit backbone, so the operator's engineering effort goes into
-market design and liquidity, not plumbing.
+exchange operator a coherent, self-hosted venue platform — matching,
+custody integration, LP connectivity, and surveillance — built on a base
+codebase whose RBAC, KYC, and audit engine already work, so the operator's
+engineering effort goes into market design and liquidity, not plumbing.
 
 ## 3. Target Market
 
@@ -48,7 +57,7 @@ Capital markets, digital asset exchanges, derivatives markets.
 
 | Capability | Comparable to | Zodize differentiation |
 |---|---|---|
-| Matching engine infrastructure | Nasdaq Matching Engine (licensed), B2C2/DXtrade-class venue tech, Talos | Ships with tenant/RBAC/audit already built via ZodiCore, faster to stand up a compliant venue |
+| Matching engine infrastructure | Nasdaq Matching Engine (licensed), B2C2/DXtrade-class venue tech, Talos | Ships with RBAC/audit already built into the inherited base codebase, faster to stand up a compliant venue |
 | Digital asset exchange platform | Coinbase Prime infrastructure tier, ErisX/CoinFLEX-class venue tech | Custody integration and surveillance share one audit trail with matching, not bolted-on separately |
 | Market surveillance | Nasdaq SMARTS, Eventus Systems | Surveillance rules operate directly on the order/trade ledger of record, not a delayed downstream feed |
 | Liquidity provider connectivity | FIX-based prime brokerage gateways, LMAX Digital LP APIs | Standardized LP API contract shared across every Zodize capital-markets product |
@@ -66,7 +75,10 @@ Capital markets, digital asset exchanges, derivatives markets.
   book via the trading UI or API.
 - **Custody/Settlement Analyst** — manages wallet/custody reconciliation
   and settlement/clearing operations.
-- **Zodize Support/Ops** — as defined in [ZodiCore §6](../ZodiCore/SPEC.md#6-personas).
+- **Buyer's own IT/support staff** — the only support layer this deployment
+  has; there is no Zodize-operated support console, since each deployment is
+  the buyer's own standalone codebase (see
+  [admin-template.md](../../templates/admin-template.md)).
 
 ## 7. User Journeys
 
@@ -92,7 +104,7 @@ Capital markets, digital asset exchanges, derivatives markets.
    or venue-wide halt → Market Operations Manager initiates the halt → new
    order acceptance for the affected symbol(s) stops, resting orders are
    preserved not canceled → on resume, the order book reopens per the
-   tenant's configured reopening auction or continuous-resume policy.
+   deployment's configured reopening auction or continuous-resume policy.
 5. **Settlement and custody reconciliation**: filled trades enter
    settlement/clearing per the market's settlement model (custodial
    ledger movement or on-chain settlement) → Custody/Settlement Analyst
@@ -119,7 +131,7 @@ Capital markets, digital asset exchanges, derivatives markets.
   distribution to subscribed clients.
 - Order types: market, limit, stop, iceberg (hidden quantity), and
   post-only (maker-guaranteed) orders.
-- Maker/taker fee schedule: configurable per tenant, per symbol, and per
+- Maker/taker fee schedule: configurable per deployment, per symbol, and per
   volume tier, applied at trade settlement.
 - Custody/wallet integration: abstraction over custodial balance ledgers
   and/or on-chain wallet balances backing tradable assets.
@@ -160,20 +172,38 @@ inherited baseline. ZodiXchange-specific additions:
 
 ## 11. Architecture
 
-ZodiXchange is a Laravel application consuming ZodiCore's identity,
-tenancy, billing, notification, RBAC, plugin, and audit packages exactly as
-described in [ZodiCore §11](../ZodiCore/SPEC.md#11-architecture), with one
-deliberate exception: the matching engine itself runs as a dedicated,
-in-memory, low-latency service per market/symbol (outside the request-
-response Laravel app) that publishes order-book and execution events onto
-the platform's event bus (per
+ZodiXchange is built by cloning the sanitized
+[base codebase](../../architecture/base-codebase-strategy.md) — a single,
+independent Laravel application the buyer deploys entirely on their own
+shared/VPS hosting (or a larger dedicated/VPS host where matching-engine
+throughput requires it), per
+[single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md).
+Building ZodiXchange means running the full
+[genericization checklist](../../architecture/product-genericization-checklist.md):
+the inherited `loans`/`dps`/`fdr`/`branches`/`other_banks` tables and
+controllers are stripped (they do not apply to an exchange), and ZodiXchange
+keeps and builds on top of the base engine's RBAC/auth (`Role`/`Permission`
+models), KYC, i18n, and admin configuration surface (see
+[base-codebase-strategy.md](../../architecture/base-codebase-strategy.md#inherited-as-is-the-admin-engine-every-product-keeps)).
+Because ZodiXchange needs multi-asset custody balances rather than a
+single-currency wallet, it extends the inherited wallet engine's pattern per
+§14 with its own `custody_balances` table rather than using `User.balance`.
+
+On that foundation, ZodiXchange makes one deliberate architectural
+exception: the matching engine itself runs as a dedicated, in-memory,
+low-latency service per market/symbol (outside the request-response Laravel
+app) that publishes order-book and execution events onto the application's
+event bus (per
 [caching-queues-events.md](../../architecture/caching-queues-events.md))
 for the Laravel app to persist, audit, and expose via API/WebSocket. This
-keeps ZodiCore's identity/audit/RBAC guarantees intact for every account
-and order action while not forcing matching-engine-critical-path latency
+keeps the inherited RBAC/audit guarantees intact for every account and
+order action while not forcing matching-engine-critical-path latency
 through a general-purpose web framework request cycle. Custody/wallet
 integration and settlement run behind a `CustodyLedgerContract` supporting
-both custodial and on-chain settlement models.
+both custodial and on-chain settlement models. ZodiXchange has no runtime
+dependency on any other Zodize product or on a Zodize-operated central
+service; the only external dependencies are the third-party custody, KYC,
+and clearing integrations the buyer's own venue configures (§22).
 
 ## 12. Technology
 
@@ -204,15 +234,18 @@ WebSocket/FIX-style gateway for LP and institutional trading connectivity.
 ## 14. Core Data Model
 
 The 12 entities below are the load-bearing core; full ER diagram is queued
-(see [Roadmap (spec depth)](#roadmap-spec-depth)).
+(see [Roadmap (spec depth)](#roadmap-spec-depth)). There is no `tenant_id`
+column anywhere in this model — each deployed instance belongs to exactly
+one exchange operator, per
+[single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md#what-single-tenant-changes-in-the-data-model).
 
 | Entity | Key columns |
 |---|---|
-| `markets` | id, tenant_id, symbol, asset_class, tick_size, lot_size, status |
+| `markets` | id, symbol, asset_class, tick_size, lot_size, status |
 | `orders` | id, account_id, market_id, side, order_type, quantity, price, hidden_quantity, status |
 | `trades` | id, market_id, buy_order_id, sell_order_id, price, quantity, executed_at |
 | `order_book_snapshots` | id, market_id, sequence_number, captured_at, depth_json |
-| `fee_schedules` | id, tenant_id, market_id, tier, maker_bps, taker_bps, effective_at |
+| `fee_schedules` | id, market_id, tier, maker_bps, taker_bps, effective_at |
 | `custody_balances` | id, account_id, asset, available_balance, held_balance, updated_at |
 | `settlements` | id, trade_id, settlement_model, status, settled_at |
 | `liquidity_providers` | id, account_id, status, quoting_permissions, rebate_tier, onboarded_at |
@@ -220,6 +253,22 @@ The 12 entities below are the load-bearing core; full ER diagram is queued
 | `trading_halts` | id, market_id, reason, initiated_by, initiated_at, resumed_at |
 | `market_makers_quotes` | id, liquidity_provider_id, market_id, bid_price, ask_price, updated_at |
 | `symbol_reference_data` | id, market_id, description, underlying_asset, contract_spec_json |
+
+**Multi-asset custody balances**: ZodiXchange genuinely needs an account to
+hold balances in multiple tradable assets/currencies simultaneously — this
+is the exchange's fundamental reason for existing. Per
+[ADR-0002](../../decisions/0002-single-currency-wallet-by-default.md), the
+inherited single-currency `User.balance`/`Transaction` engine is not
+extended globally; `custody_balances` above already implements the required
+extension pattern from
+[wallet-system.md's Multi-currency gap](../../standards/wallet-system.md#multi-currency-gap)
+— `asset` is ZodiXchange's `currency`-equivalent column, and the table is
+scoped per `account_id` rather than per `User.balance`. The corresponding
+append-only, post-balance-snapshot ledger row is `custody_ledger_entries`
+(`id`, `custody_balance_id`, `amount` (signed), `asset`, `trigger`
+(trade_settlement/deposit/withdrawal/fee), `post_balance_snapshot`,
+`reference_trade_id`, `created_at`), mirroring the inherited `Transaction`
+model's invariants rather than the shared base engine's schema itself.
 
 ## 15. Key API Endpoints
 
@@ -253,7 +302,7 @@ conform to [api-standards.md](../../development/api-standards.md) and
 
 ## 16. Events
 
-Domain events registered on ZodiCore's event bus (see
+Domain events registered on the inherited event bus (see
 [caching-queues-events.md](../../architecture/caching-queues-events.md)):
 `order.accepted`, `order.rejected`, `order.matched`, `order.canceled`,
 `market.halted`, `market.resumed`, `market.opened`, `market.closed`,
@@ -280,8 +329,11 @@ All channels follow
 
 ## 18. Permissions & Roles
 
-Extends [ZodiCore's default roles](../../security/rbac-permissions.md#default-system-roles)
-with exchange-specific roles: `Market Operations Manager`,
+Built on the inherited `Role`/`Permission` engine per
+[admin-template.md](../../templates/admin-template.md), with
+exchange-specific roles registered on top of the
+[default system roles](../../security/rbac-permissions.md#default-system-roles):
+`Market Operations Manager`,
 `Compliance/Market Surveillance Officer`, `Liquidity Provider`,
 `Custody/Settlement Analyst`, `Trader`. Key permissions: `markets.configure`,
 `markets.halt`, `markets.resume`, `orders.submit`, `orders.cancel_any`
@@ -313,7 +365,7 @@ with exchange-specific roles: `Market Operations Manager`,
 
 Every order acceptance/rejection, match, halt/resume, LP onboarding
 decision, fee schedule change, settlement status change, and surveillance
-disposition writes an immutable audit entry via ZodiCore's audit log
+disposition writes an immutable audit entry via the inherited audit log
 ([audit-logging.md](../../security/audit-logging.md)), capturing actor
 (including "system" for automated circuit breakers), timestamp, and
 before/after state. Order book snapshots are retained at a
@@ -341,22 +393,22 @@ market state at any point in time.
 - **On-chain settlement**: blockchain node/wallet infrastructure
   integration for venues settling on-chain, abstracted so the settlement
   module is chain-agnostic where feasible.
-- **Market data distribution**: outbound feed integration for tenants that
-  redistribute their own market data to third parties (consolidated tape-
-  style distribution).
-- **KYC/AML providers**: same identity-verification integration category
-  as [ZodiBank §22](../ZodiBank/SPEC.md#22-integrations) for account and LP
-  onboarding.
+- **Market data distribution**: outbound feed integration for operators
+  that redistribute their own market data to third parties (consolidated
+  tape-style distribution).
+- **KYC/AML providers**: uses the inherited base engine's KYC form-builder
+  and review flow (see
+  [admin-configuration-baseline.md](../../standards/admin-configuration-baseline.md#kyc))
+  for account and LP onboarding.
 - **Clearing houses**: optional integration for venues that clear through
   a third-party central counterparty rather than settling bilaterally.
 
 ## 23. AI Features
 
 - Market surveillance pattern detection: the rule-based surveillance engine
-  in §9 is augmented with anomaly-scoring that layers on top of ZodiCore's
-  audit-log anomaly detection ([ZodiCore §23](../ZodiCore/SPEC.md#23-ai-features)),
-  surfacing lower-confidence patterns for human review rather than
-  auto-dispositioning.
+  in §9 is augmented with anomaly-scoring that layers on top of the
+  inherited audit log's anomaly detection, surfacing lower-confidence
+  patterns for human review rather than auto-dispositioning.
 - LP quote quality scoring: summarizes an LP's quoting behavior (spread
   tightness, uptime, fill quality) to help Market Operations manage rebate
   tiers.
@@ -372,12 +424,11 @@ market state at any point in time.
 - CLI commands (Artisan): `xchange:reconcile-custody`,
   `xchange:archive-order-books`, `xchange:calculate-rebates`,
   `xchange:rescan-surveillance` — each requires the same authorization
-  context as its API equivalent, per
-  [ZodiCore §24](../ZodiCore/SPEC.md#24-automation-scheduled-jobs-cron-jobs-cli-commands).
+  context as its API equivalent.
 
 ## 25. Seed/Demo Data
 
-`XchangeDemoSeeder` provisions a demo tenant with several configured
+`XchangeDemoSeeder` provisions the demo deployment with several configured
 markets (spot and a simple derivatives symbol), a populated order book with
 resting synthetic liquidity, 12 months of trade tape history, onboarded
 demo liquidity providers with rebate history, and open/resolved
@@ -403,9 +454,9 @@ applies, plus:
   in plaintext.
 - **SOC2-equivalent controls**: change management, access review, and
   vendor risk management apply to the matching engine, custody integration,
-  and surveillance modules with the same rigor as the ZodiCore platform
-  baseline, including change control specifically for matching-engine
-  logic given its market-integrity sensitivity.
+  and surveillance modules with the same rigor as the inherited base
+  engine, including change control specifically for matching-engine logic
+  given its market-integrity sensitivity.
 - **KYC/AML** required before an account can submit its first order, with
   enhanced due diligence for liquidity provider onboarding given the
   larger capital and market-access footprint.
@@ -413,7 +464,7 @@ applies, plus:
   audit entries are append-only, matching §20.
 - **MFA is mandatory, not optional**, for every human user role submitting
   orders, managing markets, or dispositioning surveillance cases, enforced
-  at the tenant policy level per
+  at the deployment's security policy level per
   [authentication-authorization.md](../../security/authentication-authorization.md).
 - Custody balance segregation (customer assets never commingled with
   operator assets) is enforced at the data-model level in
@@ -487,10 +538,14 @@ obligations before go-live.
 
 ## Roadmap (spec depth)
 
+This spec's Architecture and Core Data Model sections were revised to
+reflect the corrected standalone, self-hosted, single-tenant deployment
+model — see
+[single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md)
+and [base-codebase-strategy.md](../../architecture/base-codebase-strategy.md).
 This spec is Foundation-depth. Queued for Deep-depth expansion: a full ER
 diagram and migration set for the order book/trade/settlement schema
 (companion `DATA_MODEL.md`), a complete endpoint catalog including the LP/
-FIX-style gateway (companion `API_REFERENCE.md`) matching
-[ZodiCore's structure](../ZodiCore/SPEC.md), and a full surveillance rule
-catalog beyond the initial spoofing/layering/wash-trading/quote-stuffing
-set. Changes follow [CONTRIBUTING.md](../../../CONTRIBUTING.md).
+FIX-style gateway (companion `API_REFERENCE.md`), and a full surveillance
+rule catalog beyond the initial spoofing/layering/wash-trading/
+quote-stuffing set. Changes follow [CONTRIBUTING.md](../../../CONTRIBUTING.md).

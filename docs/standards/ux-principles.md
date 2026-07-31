@@ -132,7 +132,8 @@ per-product judgment:
    delete one draft): optimize for safety with the lightest possible
    friction — a single confirmation dialog, no typed confirmation.
 4. **High blast radius, or financial, or irreversible at scale** (bulk
-   delete, funds transfer, permission grant, tenant-wide setting change):
+   delete, funds transfer, permission grant, company/branch-wide setting
+   change):
    optimize for safety with maximum friction — a confirmation dialog that
    restates exactly what will change and, for the highest-risk cases,
    requires the user to type a confirmation phrase. See

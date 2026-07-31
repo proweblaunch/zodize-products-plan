@@ -17,12 +17,12 @@ that drop coverage:
   the request lifecycle described in
   [`../architecture/overview.md`](../architecture/overview.md#request-lifecycle) —
   HTTP request, database queries, cache calls, queue job dispatch and
-  execution, external API calls — tagged with `tenant_id` and `request_id`
-  so a single slow request can be traced end to end.
+  execution, external API calls — tagged with `request_id` so a single slow
+  request can be traced end to end.
 - **Error tracking** (Sentry-equivalent): every unhandled exception and
   every explicitly logged `error`/`critical` log entry is captured with full
-  stack trace, request context, authenticated user ID, and tenant ID —
-  with PII redaction applied per
+  stack trace, request context, and authenticated user ID — with PII
+  redaction applied per
   [`../security/data-protection-privacy.md`](../security/data-protection-privacy.md#pii-handling)
   before the event leaves the application (no raw request bodies containing
   password/card/SSN fields sent to the error tracker).
@@ -32,9 +32,9 @@ that drop coverage:
   of the product's own infrastructure (so an infrastructure-wide outage is
   still detected and paged).
 - **Log aggregation**: structured (JSON) application logs shipped centrally
-  from every process type (web, queue worker, scheduler) with
-  `tenant_id`, `request_id`, and `user_id` fields on every log line where
-  applicable, retained a minimum of 30 days searchable, 1 year in cold
+  from every process type (web, queue worker, scheduler) with `request_id`
+  and `user_id` fields on every log line where applicable, retained a
+  minimum of 30 days searchable, 1 year in cold
   storage for financial-grade and healthcare-grade products to support
   incident investigation alongside the audit log in
   [`../security/audit-logging.md`](../security/audit-logging.md).

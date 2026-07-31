@@ -42,7 +42,7 @@ authenticated application shell and public marketing pages alike:
   exceeding 250KB gzipped MUST be justified in the PR description or split
   further.
 - Plugin-contributed frontend assets are lazy-loaded only when the plugin is
-  enabled for the tenant, per
+  enabled for the deployment, per
   [`../architecture/plugin-architecture.md`](../architecture/plugin-architecture.md#migrations-routes-and-views),
   and MUST NOT count against the base application's bundle budget.
 - Images MUST be served in a modern format (WebP/AVIF with fallback) and
@@ -64,9 +64,10 @@ authenticated application shell and public marketing pages alike:
   endpoints MUST assert an explicit query count ceiling using Laravel's
   query-log assertions, so a regression is caught in CI rather than in
   production.
-- Every `tenant_id`-filtered query on a table expected to exceed 100,000
-  rows per tenant MUST have a covering composite index per
-  [`../architecture/multi-tenancy.md`](../architecture/multi-tenancy.md#global-query-scopes-for-tenant-isolation);
+- Every `company_id`/`branch_id`-filtered query on a table expected to
+  exceed 100,000 rows per company/branch (on a product with multi-company/
+  multi-branch scoping) MUST have a covering composite index per
+  [`../development/database-standards.md`](../development/database-standards.md#single-tenant-at-the-schema-level);
   the database standards in [`../development/`](../development/) define the
   exact indexing conventions this inherits from.
 - Slow query logging MUST be enabled in production with a 100ms threshold,
@@ -115,4 +116,4 @@ authenticated application shell and public marketing pages alike:
 - [`ci-cd-standards.md`](./ci-cd-standards.md)
 - [`definition-of-production-ready.md`](./definition-of-production-ready.md)
 - [`../architecture/caching-queues-events.md`](../architecture/caching-queues-events.md)
-- [`../architecture/multi-tenancy.md`](../architecture/multi-tenancy.md)
+- [`../architecture/single-tenant-deployment-model.md`](../architecture/single-tenant-deployment-model.md)

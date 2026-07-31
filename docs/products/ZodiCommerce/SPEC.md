@@ -41,7 +41,7 @@ retail channels.
 
 | Capability | Comparable to | Zodize differentiation |
 |---|---|---|
-| Enterprise storefront platform | Shopify Plus, BigCommerce Enterprise | Native multi-tenant ZodiCore identity/RBAC/audit instead of a third-party app marketplace bolted onto checkout |
+| Enterprise storefront platform | Shopify Plus, BigCommerce Enterprise | Self-hosted, single-merchant deployment with the base engine's own RBAC/audit built in, instead of a third-party app marketplace bolted onto checkout |
 | Order management / channel aggregation | Salesforce Order Management, Fluent Commerce | Inventory sync and order routing built into the same data model as accounting and POS, not a middleware layer |
 | Marketplace channel management | ChannelAdvisor, CommerceHub | First-party integration category (§20) rather than a separate paid tool |
 | Returns/RMA | Loop Returns, Narvar | RMA lifecycle lives in the same order record and audit trail as the original sale |
@@ -147,29 +147,61 @@ ZodiCommerce-specific additions:
 
 ## 11. Architecture
 
-ZodiCommerce is a tenant application on [ZodiCore](../ZodiCore/SPEC.md),
-consuming `zodize/core-identity`, `zodize/core-permissions`,
-`zodize/core-billing` (for the merchant's own Zodize subscription, distinct
-from the merchant's customer-facing payment processing), and
-`zodize/core-notifications` as Composer packages per
-[architecture/overview.md](../../architecture/overview.md). The storefront is
-a separate Vue SPA/SSR front end from the merchant admin console but shares
-the same Laravel API and tenant boundary. Channel connectors (marketplace,
-shipping carriers) run as queued integration workers so a third-party API
-outage cannot block checkout. Inventory is modeled as a single ledger service
-that every channel connector and the POS-originated order path write through,
-per [multi-tenancy.md](../../architecture/multi-tenancy.md) tenant scoping.
+ZodiCommerce is built by cloning the sanitized base codebase and running the
+[genericization checklist](../../architecture/product-genericization-checklist.md):
+the banking-specific `loans`/`dps`/`fdr`/`branches`/`branch_staff`/
+`other_banks`/`beneficiaries`/`airtime` tables are stripped, since none of
+ZodiCommerce's target retailers need them, and the `branch_staff` guard is
+dropped by default. ZodiCommerce inherits the base engine's wallet/ledger
+(used for store-credit issuance and refunds, per
+[wallet-system.md](../../standards/wallet-system.md)), payment gateway
+integrations (§22), RBAC/auth, KYC, i18n, and admin configuration surface
+(per
+[admin-configuration-baseline.md](../../standards/admin-configuration-baseline.md))
+unmodified, then layers its own Catalog, Inventory, Storefront, Orders,
+Promotions, Channels, and Returns modules (§13) on top, per
+[base-codebase-strategy.md](../../architecture/base-codebase-strategy.md#layering-a-products-domain-modules-onto-the-sanitized-base).
+
+The storefront and the merchant's admin console are one Laravel application
+per buyer deployment — see
+[overview.md](../../architecture/overview.md#modular-monolith-one-codebase-per-product) —
+with the public storefront pages rendered through the
+[frontend–backend bridge](../../architecture/frontend-backend-bridge.md) so a
+merchant edits catalog and CMS content from the admin panel with zero code
+changes. There is no shared tenant boundary and no ZodiCore platform
+dependency: each ZodiCommerce deployment is one merchant's standalone,
+self-hosted instance, per
+[single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md).
+
+Channel connectors (marketplaces, shipping carriers, and, where a merchant
+separately operates [ZodiPOS](../ZodiPOS/SPEC.md) on their own hosting, an
+API-based POS order-ingestion connector) run as queued integration workers so
+a third-party API outage cannot block checkout — this is an API integration
+between two independently deployed products the merchant happens to own,
+never a shared database or runtime. Inventory is modeled as a single ledger
+service within this one deployment's database that every channel connector
+writes through; because the deployment is single-tenant, that ledger is
+unambiguously this one merchant's stock truth, with no `tenant_id` needed to
+scope it. Merchants operating multiple brands or storefronts under one
+deployment use the `company_id`-scoped multi-company model in §14, per
+[localization-i18n.md](../../standards/localization-i18n.md#multi-company--multi-branch-data-scoping) —
+this is scoping within one deployment, not tenancy.
 
 ## 12. Technology
 
-Laravel (PHP) + Vue per
-[coding-standards-php-laravel.md](../../development/coding-standards-php-laravel.md)
-and [coding-standards-vue.md](../../development/coding-standards-vue.md);
-PostgreSQL + Redis per
+Laravel (PHP) per the base codebase's stack (Laravel 11, PHP ^8.3, Vite 5) —
+see
+[base-codebase-strategy.md](../../architecture/base-codebase-strategy.md) —
+following
+[coding-standards-php-laravel.md](../../development/coding-standards-php-laravel.md);
+MySQL/MariaDB + Redis (where the buyer's hosting supports it, with a file/DB
+cache fallback) per
 [database-standards.md](../../development/database-standards.md); a
-dedicated storefront caching/CDN layer for catalog pages; a queue-driven
-integration layer for marketplace and shipping-carrier connectors so
-third-party latency never blocks the checkout critical path.
+storefront-page caching layer for catalog pages within the buyer's own
+hosting (no assumed external CDN); a queue-driven integration layer for
+marketplace and shipping-carrier connectors so third-party latency never
+blocks the checkout critical path, per
+[caching-queues-events.md](../../architecture/caching-queues-events.md).
 
 ## 13. Modules & Submodules
 
@@ -188,20 +220,27 @@ third-party latency never blocks the checkout critical path.
 
 | Entity | Key columns |
 |---|---|
-| `products` | id, tenant_id, sku_prefix, name, status, category_id, created_at |
+| `companies` | id, name, default_currency, is_active |
+| `products` | id, company_id, sku_prefix, name, status, category_id, created_at |
 | `product_variants` | id, product_id, sku, attributes (jsonb), price, weight |
-| `channels` | id, tenant_id, type (web/marketplace/pos), name, connector_config |
+| `channels` | id, company_id, type (web/marketplace/pos), name, connector_config |
 | `channel_listings` | id, variant_id, channel_id, channel_price, is_active |
 | `inventory_ledger` | id, variant_id, warehouse_id, quantity_on_hand, quantity_reserved |
-| `warehouses` | id, tenant_id, name, address, is_fulfillment_active |
-| `orders` | id, tenant_id, channel_id, customer_id, status, subtotal, tax, total, placed_at |
+| `warehouses` | id, company_id, name, address, is_fulfillment_active |
+| `orders` | id, company_id, channel_id, customer_id, status, subtotal, tax, total, placed_at |
 | `order_items` | id, order_id, variant_id, quantity, unit_price, fulfilled_quantity |
 | `shipments` | id, order_id, carrier, tracking_number, label_url, shipped_at |
-| `promotions` | id, tenant_id, type, value, stacking_policy, starts_at, ends_at |
+| `promotions` | id, company_id, type, value, stacking_policy, starts_at, ends_at |
 | `promotion_redemptions` | id, promotion_id, order_id, customer_id, redeemed_at |
-| `customers` | id, tenant_id, user_id, default_address_id, lifetime_value |
+| `customers` | id, company_id, user_id, default_address_id, lifetime_value |
 | `rma_requests` | id, order_id, reason_code, status, disposition, refund_amount |
 | `payment_transactions` | id, order_id, gateway, amount, status, gateway_reference |
+
+`companies` is optional multi-brand/multi-storefront scoping within this one
+merchant's single deployment (e.g. a merchant running two separate
+storefront brands from one install) per
+[localization-i18n.md](../../standards/localization-i18n.md#multi-company--multi-branch-data-scoping) —
+a merchant running one brand has exactly one seeded `companies` row.
 
 ## 15. Key API Endpoints
 
@@ -253,18 +292,26 @@ All channels follow
 
 ## 18. Permissions & Roles
 
-Extends ZodiCore's default roles
-([rbac-permissions.md](../../security/rbac-permissions.md#default-system-roles))
-with ZodiCommerce-specific permissions: `catalog.manage`,
-`inventory.adjust`, `orders.fulfill`, `orders.cancel`, `promotions.manage`,
-`rma.approve`, `rma.refund`, `channels.manage`. `rma.refund` is not granted to
-the default `Member` role — refund issuance requires `Manager` or above,
-consistent with the approval chain in §19.
+Built on the base engine's inherited `Role`/`Permission` RBAC (not Spatie),
+per
+[admin-template.md](../../templates/admin-template.md#roles--permissions-inherited-not-spatie).
+ZodiCommerce's `DemoSeeder` ships its own default admin roles — Store Owner,
+Store Manager, Merchandiser, Fulfillment Manager, and Customer Service Rep —
+each granted a subset of ZodiCommerce's product-specific permissions:
+`catalog.manage`, `inventory.adjust`, `orders.fulfill`, `orders.cancel`,
+`promotions.manage`, `rma.approve`, `rma.refund`, `channels.manage`.
+`rma.refund` is not granted to the default `Customer Service Rep` role —
+refund issuance requires `Store Manager` or above, consistent with the
+approval chain in §19. A merchant can create additional custom roles and
+reassign any permission entirely from the admin panel, with no code change,
+per
+[admin-configuration-baseline.md](../../standards/admin-configuration-baseline.md#roles--permissions).
 
 ## 19. Workflows & Approval Chains
 
-- **Refund approval**: refunds above a tenant-configured threshold require a
-  `Manager`-role approval step before the payment gateway is called, mirroring
+- **Refund approval**: refunds above an admin-configured threshold require a
+  `Store Manager`-role approval step before the payment gateway is called,
+  mirroring
   [modal-standards.md](../../standards/modal-standards.md#confirmation-dialogs).
 - **Promotion activation approval**: promotions discounting more than a
   configurable percentage require a second approver before `starts_at` is
@@ -276,10 +323,9 @@ consistent with the approval chain in §19.
 ## 20. Audit Logs
 
 Every catalog change, inventory adjustment, order status transition, RMA
-disposition, and promotion activation is recorded to ZodiCore's shared audit
-log (`audit_logs`, see [ZodiCore SPEC.md §14](../ZodiCore/SPEC.md#14-database-design))
-with actor, before/after values, and channel origin, per
-[audit-logging.md](../../security/audit-logging.md). Manual inventory
+disposition, and promotion activation is recorded to this deployment's own
+audit log (`audit_logs`) with actor, before/after values, and channel origin,
+per [audit-logging.md](../../security/audit-logging.md). Manual inventory
 adjustments always require a reason code captured in the audit entry.
 
 ## 21. Reports & Analytics & Dashboards
@@ -292,15 +338,26 @@ warehouse, and a fulfillment-SLA dashboard (time from `payment_confirmed` to
 
 ## 22. Integrations
 
-- **Payment gateways**: Stripe, Adyen, PayPal, plus the `PaymentGatewayContract`
-  abstraction from [ZodiCore §20](../ZodiCore/SPEC.md#20-payment-gateways-wallet-accounting-taxes-invoices).
+- **Payment gateways**: the inherited gateway catalog documented in
+  [payment-gateways.md](../../standards/payment-gateways.md) — Stripe and
+  Authorize.Net for card processing, BTCPay Server and CoinGate for optional
+  cryptocurrency acceptance, Mollie and Razorpay for EU/India-focused
+  merchants, Flutterwave and Paystack for merchants in Zodize's primary
+  African market (added to the base per that standard's open action item if
+  not already present), and the native manual/offline gateway as a
+  always-available fallback. A merchant enables and configures only the
+  gateways relevant to their market entirely from the admin panel — no code
+  change either way.
 - **Shipping carriers**: UPS, FedEx, USPS, DHL via a rate-shopping
-  abstraction layer.
+  abstraction layer built as a ZodiCommerce domain module.
 - **Marketplaces**: Amazon, Walmart Marketplace, eBay connectors normalizing
   orders/inventory into the shared ledger.
 - **Tax calculation**: Avalara/TaxJar-class tax-engine integration.
-- **Accounting**: sync of orders/refunds into [ZodiBusiness](../ZodiBusiness/SPEC.md)
-  or an external ERP's chart of accounts.
+- **Accounting**: order/refund export via an API integration into a
+  separately-deployed [ZodiBusiness](../ZodiBusiness/SPEC.md) instance the
+  merchant may run on their own hosting, or into an external ERP's chart of
+  accounts — never a shared database, per
+  [single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md#no-shared-platform-service).
 
 ## 23. AI Features
 
@@ -344,7 +401,10 @@ Payment data never touches ZodiCommerce's own database — card details are
 tokenized at the gateway per
 [data-protection-privacy.md](../../security/data-protection-privacy.md);
 only gateway references are stored. Customer PII (addresses, order history)
-is tenant-isolated per [multi-tenancy.md](../../architecture/multi-tenancy.md).
+belongs to this one deployment's single merchant by construction — see
+[single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md) —
+and access within the deployment is governed by the RBAC model in §18, not a
+tenant-isolation boundary.
 
 ## 28. Testing Requirements
 
@@ -379,7 +439,7 @@ storefront downtime.
 See [production-readiness-checklist.md](../../checklists/production-readiness-checklist.md);
 ZodiCommerce additionally requires sign-off that every connected channel
 connector has passed a sandbox-mode order/inventory round-trip test before
-being enabled for a live tenant.
+being enabled in a live deployment.
 
 ## 32. Future Roadmap
 
@@ -408,8 +468,16 @@ being enabled for a live tenant.
 
 ## Roadmap (spec depth)
 
-This spec is Foundation-depth. Queued for Deep-depth expansion: a full ER
-diagram covering tax-jurisdiction and multi-currency pricing tables, the
-complete endpoint catalog (bulk catalog operations, webhook management
-endpoints), and a dedicated `DATA_MODEL.md`/`API_REFERENCE.md` pair matching
+This spec is Foundation-depth. Its Architecture and Core Data Model sections
+were revised to the standalone, self-hosted, single-tenant base-codebase
+model described in
+[architecture/overview.md](../../architecture/overview.md) and
+[single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md);
+ZodiCommerce is the second product in the build order
+([ROADMAP.md](../../../ROADMAP.md)) validating the clone → genericize →
+bridge → extend pipeline this correction assumes. Queued for Deep-depth
+expansion: a full ER diagram covering tax-jurisdiction and multi-currency
+pricing tables, the complete endpoint catalog (bulk catalog operations,
+webhook management endpoints), and a dedicated
+`DATA_MODEL.md`/`API_REFERENCE.md` pair matching
 [ZodiCore](../ZodiCore/SPEC.md)'s companion-document structure.

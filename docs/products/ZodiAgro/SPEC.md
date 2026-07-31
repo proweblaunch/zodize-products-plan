@@ -11,10 +11,11 @@
 ZodiAgro is the operations system of record for farm and agribusiness
 enterprises — mapping every field, planning every crop cycle, logging every
 input application, tracking every harvest, and producing the traceability
-records regulators and buyers demand — built on the same ZodiCore
-foundation ([SPEC.md](../ZodiCore/SPEC.md)) every Zodize product shares, so
-a multi-farm operator gets enterprise identity, multi-entity tenancy, and
-billing without a separate ag-tech vendor relationship.
+records regulators and buyers demand — built as a standalone, self-hosted
+Laravel application from the shared Zodize base codebase
+([base-codebase-strategy.md](../../architecture/base-codebase-strategy.md)),
+so a multi-farm operator gets a working admin back office, RBAC, and
+multi-entity data scoping without a separate ag-tech vendor relationship.
 
 ## 2. Purpose
 
@@ -47,7 +48,7 @@ operations, and agricultural cooperatives.
 | Precision ag / field mapping | John Deere Operations Center | Vendor-neutral IoT/telematics ingestion, not locked to one equipment brand |
 | Livestock management | AgriWebb | Same platform as crop planning — one operation, one system, not two logins |
 | Farm-to-table traceability | HarvestMark, Trace Genomics (partial) | Traceability built into the core input/harvest data model, not a bolt-on compliance module |
-| Agribusiness ERP | Conservis | Enterprise RBAC, audit trail, and multi-entity tenancy inherited from ZodiCore from day one |
+| Agribusiness ERP | Conservis | Enterprise RBAC, audit trail, and multi-entity data scoping inherited from the base engine from day one |
 
 ## 6. Personas
 
@@ -158,17 +159,35 @@ without degrading interactive dashboard query latency (p95 dashboard load
 
 ## 11. Architecture
 
-ZodiAgro is a tenant application on ZodiCore
-([architecture/overview.md](../../architecture/overview.md)), consuming
-`zodize/core-identity`, `zodize/core-billing`, `zodize/core-notifications`,
-`zodize/core-permissions`, and `zodize/core-plugins` as Composer packages.
-Farm entities/growers are modeled as ZodiCore `companies` under a
-cooperative/aggregator tenant (per
-[multi-tenancy.md](../../architecture/multi-tenancy.md)), enabling a
-cooperative to manage many grower entities with entity-scoped data
-isolation and aggregate reporting. IoT/sensor and weather ingestion runs
-through a dedicated write-optimized time-series pipeline (queued, batched
-inserts) decoupled from the primary transactional data model, per
+ZodiAgro is a standalone, self-hosted Laravel application, sold as source
+code to one farm operation or cooperative and deployed entirely within that
+buyer's own hosting account — there is no shared platform service and no
+other Zodize product it depends on at runtime
+([single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md)).
+It is built by cloning the sanitized base codebase and running the
+[genericization checklist](../../architecture/product-genericization-checklist.md):
+the banking-specific tables (`loans`, `dps`, `fdr`, `branches`/
+`branch_staff`, `other_banks`, `beneficiaries`, `airtime_operators`) are
+stripped, and ZodiAgro's own domain modules — field management, crop
+planning, input tracking, harvest, livestock, weather/IoT, compliance &
+traceability, equipment — are built on top of the inherited engine's
+wallet/ledger, payment gateways, RBAC/auth, KYC, i18n, and admin
+configuration surface (see
+[base-codebase-strategy.md](../../architecture/base-codebase-strategy.md)
+and
+[admin-configuration-baseline.md](../../standards/admin-configuration-baseline.md)).
+
+A cooperative/aggregator buyer managing several grower entities under one
+deployment scopes them via `company_id`, following
+[localization-i18n.md](../../standards/localization-i18n.md#multi-company--multi-branch-data-scoping)
+— this is data scoping within one buyer's one deployment, not multi-tenancy;
+there is no `tenant_id` anywhere in ZodiAgro's schema, and a cooperative's
+member-grower entities are not isolated from one another the way separate
+SaaS customer organizations would be, since they all belong to the one
+buyer who purchased and deployed this instance. IoT/sensor and weather
+ingestion runs through a dedicated write-optimized time-series pipeline
+(queued, batched inserts) decoupled from the primary transactional data
+model, per
 [caching-queues-events.md](../../architecture/caching-queues-events.md), so
 high-frequency sensor writes never contend with interactive field/harvest
 transactions.
@@ -200,9 +219,16 @@ local-first sync layer.
 
 ## 14. Core Data Model
 
+All tables belong to the one buyer's one deployment — there is no
+`tenant_id` column anywhere in this model
+([single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md)).
+A cooperative operating several grower entities scopes them via
+`company_id`, following
+[localization-i18n.md](../../standards/localization-i18n.md#multi-company--multi-branch-data-scoping).
+
 | Entity | Key columns | Notes |
 |---|---|---|
-| `farms` | id, tenant_id, company_id, name, location | Maps to a ZodiCore `company`; a grower entity |
+| `farms` | id, company_id, name, location | A grower entity, scoped to the owning company |
 | `fields` | id, farm_id, name, boundary_geo, acreage, soil_zone | PostGIS polygon boundary |
 | `crop_plans` | id, field_id, season, crop, variety, planned_planting_date | One per field per season |
 | `planting_events` | id, crop_plan_id, actual_planting_date, seed_lot_id, rate | Actual planting record |
@@ -269,9 +295,9 @@ All channels follow
 
 ## 18. Permissions & Roles
 
-Inherits ZodiCore default roles
-([rbac-permissions.md](../../security/rbac-permissions.md#default-system-roles))
-scoped per farm/entity. ZodiAgro-specific permissions: `fields.manage`,
+Inherits the base codebase's default admin roles
+([rbac-permissions.md](../../security/rbac-permissions.md#default-system-roles)),
+scoped per farm/entity via `company_id`. ZodiAgro-specific permissions: `fields.manage`,
 `crop_plans.manage`, `input_applications.log`,
 `input_applications.override_phi_flag` (elevated — requires Farm Manager+),
 `harvest.log`, `livestock.manage`, `treatments.log`, `equipment.schedule`,
@@ -294,7 +320,7 @@ can log data but cannot override a PHI/withdrawal conflict flag.
 ## 20. Audit Logs
 
 Every input application, treatment, harvest event, equipment job, and
-compliance record attachment is recorded to the ZodiCore audit log with
+compliance record attachment is recorded to the deployment's audit log with
 actor, timestamp, before/after values, and field/farm scope — per
 [audit-logging.md](../../security/audit-logging.md). Traceability lots carry
 an immutable, append-only chain-of-custody log distinct from general audit
@@ -357,7 +383,7 @@ traceable harvest-to-shipment lot chain — per
 ## 26. Performance Requirements
 
 See §10; additionally: sensor ingestion pipeline sustains at least 500
-readings/second per tenant without degrading interactive query latency, and
+readings/second per deployment without degrading interactive query latency, and
 a traceability chain export for a single shipped lot completes in under 5
 seconds regardless of how many input applications are in the chain.
 

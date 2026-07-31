@@ -113,7 +113,8 @@ education divisions.
 - Make FERPA-equivalent consent and access-scoping enforcement automatic
   rather than a manual policy registrars must remember to apply per family.
 - Increase parent/guardian portal engagement (payments, grade visibility
-  where permitted) as a retention and satisfaction driver for K-12 tenants.
+  where permitted) as a retention and satisfaction driver for K-12 school
+  buyers.
 
 ## 9. Functional Requirements
 
@@ -157,30 +158,62 @@ inherited baseline. ZodiCampus-specific additions:
 
 ## 11. Architecture
 
-ZodiCampus is a tenant application on [ZodiCore](../ZodiCore/SPEC.md),
-consuming `zodize/core-identity`, `zodize/core-billing`,
-`zodize/core-notifications`, `zodize/core-permissions`, and
-`zodize/core-plugins` per ZodiCore's
-[Architecture](../ZodiCore/SPEC.md#11-architecture) section. ZodiCampus adds
-a `FERPAConsentContract` layered on ZodiCore's RBAC engine that scopes
-guardian and third-party access to a student's record based on the
-student's age-of-majority status and any consent/release on file, evaluated
-at query time rather than relied upon as a role assignment alone. Academic,
-billing, and admissions modules are Laravel domains within the tenant
-application; multi-campus/multi-school-network institutions map onto
-ZodiCore's tenant/company/branch hierarchy per
-[multi-tenancy.md](../../architecture/multi-tenancy.md).
+ZodiCampus is a standalone, self-hosted Laravel application, built by
+cloning the sanitized base codebase and running the
+[genericization checklist](../../architecture/product-genericization-checklist.md)
+per
+[base-codebase-strategy.md](../../architecture/base-codebase-strategy.md).
+The clone strips every banking-specific table that doesn't apply to a
+student-information system — `loans`/`loan_plans`, `dps`/`dps_plans`,
+`fdr`/`fdr_plans`, `branches`/`branch_staff` and its guard, `other_banks`,
+`beneficiaries`, `airtime_operators`/`airtime_configs`. ZodiCampus does not
+re-add a branch-scoped staff guard: its personas (Registrar, Faculty,
+Advisor, Financial Aid/Bursar Staff) all authenticate through the inherited
+`admin` guard, with per-campus access governed by RBAC/policy scoping (§18)
+rather than a separate login guard — a multi-campus school network or
+higher-ed institution with multiple locations models each campus as a
+`campuses` record under the multi-company/multi-branch scoping pattern in
+[localization-i18n.md](../../standards/localization-i18n.md#multi-company--multi-branch-data-scoping),
+not as a distinct auth boundary.
+
+ZodiCampus inherits the base engine's admin settings/branding, payment
+gateways (for tuition/payment-plan billing), wallet/ledger (for student
+account balances), RBAC/auth, i18n, cron, extension toggles, and CMS/page
+builder as-is — see
+[base-codebase-strategy.md](../../architecture/base-codebase-strategy.md#inherited-as-is-the-admin-engine-every-product-keeps).
+On top of that inherited engine, ZodiCampus builds its own domain modules
+(Admissions, Student Records, Registration, Academics, Attendance, Billing &
+Aid, Faculty Portal, Family Portal) per
+[`module-template.md`](../../templates/module-template.md).
+
+The one addition that goes beyond ordinary domain-module layering is a
+`FERPAConsentContract` service, built on top of the inherited `Role`/
+`Permission` RBAC engine rather than replacing it: guardian and
+third-party access to a student's record is scoped by the student's
+age-of-majority status and any consent/release on file, evaluated at query
+time in addition to the standard RBAC permission check. This is the
+Policy-layer pattern described in
+[admin-template.md](../../templates/admin-template.md#roles--permissions-inherited-not-spatie):
+an additional rule layered on the inherited RBAC engine, not a second,
+competing permission system.
+
+Each ZodiCampus deployment belongs to exactly one school, campus, or
+school network, running on their own hosting with their own database, with
+zero runtime dependency on any other Zodize product or Zodize-operated
+service, per
+[single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md).
 
 ## 12. Technology
 
-Laravel + Vue per the shared stack
-([coding-standards-php-laravel.md](../../development/coding-standards-php-laravel.md),
-[coding-standards-vue.md](../../development/coding-standards-vue.md));
-PostgreSQL + Redis per
+Laravel 11 + PHP ^8.3 per the inherited base codebase
+([coding-standards-php-laravel.md](../../development/coding-standards-php-laravel.md)),
+with Blade/Vue for new module UI per
+[coding-standards-vue.md](../../development/coding-standards-vue.md);
+MySQL/MariaDB per the base codebase's inherited schema, matching
 [database-standards.md](../../development/database-standards.md), with
 row-level locking for seat-capacity-constrained registration writes; payment
-processing via ZodiCore's payment gateway abstraction
-(§20 of [ZodiCore's SPEC.md](../ZodiCore/SPEC.md#20-payment-gateways-wallet-accounting-taxes-invoices)).
+processing via the inherited base codebase's payment gateway abstraction
+(see [payment-gateways.md](../../standards/payment-gateways.md)).
 
 ## 13. Modules & Submodules
 
@@ -197,15 +230,21 @@ processing via ZodiCore's payment gateway abstraction
 
 ## 14. Core Data Model
 
-Full ER diagram queued (§ Roadmap). Core entities:
+Full ER diagram queued (§ Roadmap). Every entity below belongs to the one
+school, campus, or school network that owns this deployment — there is no
+`tenant_id` column anywhere in this schema, per
+[single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md).
+`campus_id` provides multi-campus scoping within that one deployment, per
+[localization-i18n.md](../../standards/localization-i18n.md#multi-company--multi-branch-data-scoping).
+Core entities:
 
 | Entity | Key columns |
 |---|---|
-| `applicants` | id, tenant_id, program_id, application_status, decision, decided_at |
-| `students` | id, tenant_id, student_number, program_id, enrollment_status, is_minor |
+| `applicants` | id, campus_id, program_id, application_status, decision, decided_at |
+| `students` | id, campus_id, student_number, program_id, enrollment_status, is_minor |
 | `guardians` | id, student_id, guardian_user_id, relationship, ferpa_consent_on_file |
-| `terms` | id, tenant_id, name, start_date, end_date, registration_opens_at |
-| `courses` | id, tenant_id, code, title, credit_hours, prerequisite_course_ids |
+| `terms` | id, campus_id, name, start_date, end_date, registration_opens_at |
+| `courses` | id, campus_id, code, title, credit_hours, prerequisite_course_ids |
 | `sections` | id, course_id, term_id, instructor_id, seat_capacity, seats_filled |
 | `registrations` | id, student_id, section_id, status (enrolled/waitlisted/dropped), registered_at |
 | `grades` | id, registration_id, grade_value, submitted_by, submitted_at, locked_at |
@@ -273,15 +312,20 @@ consent record for students past the age of majority, per §27.
 
 ## 18. Permissions & Roles
 
-Inherits ZodiCore's default system roles
-([rbac-permissions.md](../../security/rbac-permissions.md#default-system-roles))
-plus ZodiCampus-specific roles: `Registrar`, `Admissions Officer`,
+Built on the inherited `Role`/`Permission` engine and `admin` guard per
+[admin-template.md](../../templates/admin-template.md#roles--permissions-inherited-not-spatie).
+ZodiCampus's own roles: `Registrar`, `Admissions Officer`,
 `Faculty/Instructor`, `Academic Advisor`, `Financial Aid/Bursar Staff`,
 `Student` (portal-only, scoped to own record), `Guardian` (portal-only,
-FERPA-consent-scoped). Key permissions: `applications.decide`,
-`registrations.manage` (Registrar/Advisor), `grades.submit` (section
-instructor of record only), `grades.change_post_lock` (requires approval,
-§19), `holds.manage`, `financial_aid.award`, `transcripts.issue_official`.
+FERPA-consent-scoped). Key permissions, registered into the inherited
+permission system per
+[permission-template.md](../../templates/permission-template.md):
+`applications.decide`, `registrations.manage` (Registrar/Advisor),
+`grades.submit` (section instructor of record only, gated additionally by
+the `FERPAConsentContract` — the FERPA-equivalent access-control need is an
+additional Policy-layer rule on top of the inherited RBAC, not a separate
+system), `grades.change_post_lock` (requires approval, §19), `holds.manage`,
+`financial_aid.award`, `transcripts.issue_official`.
 
 ## 19. Workflows & Approval Chains
 
@@ -327,16 +371,16 @@ consent record relied upon, supporting FERPA-equivalent recordkeeping.
   exchange networks (Parchment/National Student Clearinghouse-class) for
   inbound prior-institution transcripts and outbound official transcript
   delivery.
-- **Payment processing**: tuition and payment-plan processing via
-  ZodiCore's payment gateway abstraction.
+- **Payment processing**: tuition and payment-plan processing via the
+  inherited base codebase's payment gateway abstraction.
 - **Financial aid systems**: federal/state aid system integration for
-  higher-education tenants (e.g. FAFSA-adjacent data exchange where
-  applicable to the tenant's jurisdiction).
+  higher-education institutions (e.g. FAFSA-adjacent data exchange where
+  applicable to the institution's jurisdiction).
 - **LMS integration**: grade passback and roster sync with common learning
-  management systems (Canvas/Moodle-class) for tenants running a separate
-  LMS alongside ZodiCampus.
+  management systems (Canvas/Moodle-class) for institutions running a
+  separate LMS alongside ZodiCampus.
 - **SIS data exchange**: standard education data interchange formats for
-  district/network-level reporting (K-12 tenants).
+  district/network-level reporting (K-12 school networks).
 
 ## 23. AI Features
 
@@ -346,9 +390,9 @@ consent record relied upon, supporting FERPA-equivalent recordkeeping.
 - AI-assisted transcript/document review during admissions, extracting
   structured data (courses, grades) from uploaded transcripts for
   Admissions Officer review — never an auto-decision.
-- Anomaly detection on grade-change and access-record patterns, extending
-  ZodiCore's audit anomaly detection
-  (§23 of [ZodiCore's SPEC.md](../ZodiCore/SPEC.md#23-ai-features)).
+- Anomaly detection on grade-change and access-record patterns, built on
+  ZodiCampus's own audit log data per
+  [audit-logging.md](../../security/audit-logging.md).
 
 ## 24. Automation, Scheduled Jobs, CLI Commands
 
@@ -389,12 +433,13 @@ applies. ZodiCampus-specific requirements (FERPA-equivalent):
   minor, or explicit consent for an adult student) is denied and logged as
   a denied attempt.
 - **Directory information handling**: fields designated as directory
-  information are configurable per tenant policy and excludable per
-  student opt-out, distinct from the broader consent-gated record set.
+  information are configurable per the institution's own policy and
+  excludable per student opt-out, distinct from the broader consent-gated
+  record set.
 - **Data segregation for third-party requesters**: transcript/record
   requests from third parties (e.g. another institution) require the same
   consent basis as guardian access and are logged identically.
-- **Retention and disposal**: student records follow the tenant's
+- **Retention and disposal**: student records follow the institution's
   configured retention policy per
   [data-protection-privacy.md](../../security/data-protection-privacy.md),
   respecting jurisdiction-specific minimum retention for academic records.
@@ -440,13 +485,13 @@ See [production-readiness-checklist.md](../../checklists/production-readiness-ch
 
 ## 33. Known Risks
 
-- FERPA consent-scoping defects carry direct legal exposure for education
-  tenants — mitigated by the dedicated access-control test suite in §28,
-  but this remains the module requiring the most conservative change-review
-  process.
+- FERPA consent-scoping defects carry direct legal exposure for the schools
+  and institutions running this product — mitigated by the dedicated
+  access-control test suite in §28, but this remains the module requiring
+  the most conservative change-review process.
 - Registration-window concurrency is a recurring real-world failure point
   for SIS platforms (overbooking, race conditions) — mitigated by
-  row-level locking per §12, but load testing ahead of each tenant's
+  row-level locking per §12, but load testing ahead of each deployment's
   registration windows remains an operational requirement.
 
 ## 34. Future Improvements
@@ -456,7 +501,12 @@ See [production-readiness-checklist.md](../../checklists/production-readiness-ch
 
 ## Roadmap (spec depth)
 
-This spec is Foundation-depth. Queued for Deep-depth expansion: full ER
-diagram and migration set (companion `DATA_MODEL.md`), full endpoint
-catalog (companion `API_REFERENCE.md`), full degree-audit rule engine
-design, and a complete report catalog beyond the summary list in §21.
+This spec is Foundation-depth. Its Architecture (§11), Core Data Model
+(§14), and Permissions & Roles (§18) sections were revised to the
+standalone, self-hosted, single-tenant model in
+[single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md);
+no product-domain content (vision, personas, journeys, academic/billing
+workflows) changed. Queued for Deep-depth expansion: full ER diagram and
+migration set (companion `DATA_MODEL.md`), full endpoint catalog (companion
+`API_REFERENCE.md`), full degree-audit rule engine design, and a complete
+report catalog beyond the summary list in §21.

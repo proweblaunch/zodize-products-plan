@@ -88,9 +88,9 @@ Every code sample rendered via `CodeSample.vue` MUST:
 - Include a language tag for syntax highlighting.
 - Show at least a `curl` example and one SDK example (where a Zodize SDK
   exists) for every API Reference endpoint sample.
-- Never embed real API keys, tenant IDs, or secrets; use the literal
-  placeholders `YOUR_API_KEY` and `YOUR_TENANT_ID`, styled distinctly so they
-  read as placeholders, not copy-pasteable values.
+- Never embed real API keys or secrets; use the literal placeholder
+  `YOUR_API_KEY`, styled distinctly so it reads as a placeholder, not a
+  copy-pasteable value.
 
 ## API reference auto-generation
 
@@ -102,10 +102,15 @@ from the actual API and is treated as a documentation defect. The API
 Reference page renders this spec directly; guide authors MUST NOT copy
 endpoint signatures into prose guides — link to the reference instead.
 
-## What ZodiCore provides vs. what a product customizes
+## What the shared component library provides vs. what a product customizes
 
-ZodiCore provides: `DocsSearch.vue`, `VersionSwitcher.vue`, `CodeSample.vue`,
-the OpenAPI generation build step, and the changelog-to-docs sync job.
+The shared frontend component library every product's codebase includes
+(see
+[`../architecture/frontend-backend-bridge.md`](../architecture/frontend-backend-bridge.md))
+provides: `DocsSearch.vue`, `VersionSwitcher.vue`, `CodeSample.vue`, the
+OpenAPI generation build step, and the changelog-to-docs sync job. These
+ship inside the product's own codebase, not as a call to another Zodize
+product at runtime.
 
 A product customizes: all content under `content/getting-started/` and
 `content/guides/`, and the FAQ entries. A product MUST NOT hand-write API

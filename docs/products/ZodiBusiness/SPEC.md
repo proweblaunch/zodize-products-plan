@@ -8,10 +8,10 @@
 ## 1. Vision
 
 ZodiBusiness is the small-and-midsize-business operating system: CRM,
-inventory, quoting, invoicing, and core accounting in one tenant application,
-so an SMB owner runs their whole operation without stitching together a CRM
-tool, a spreadsheet-based inventory count, and a separate accounting package
-that never quite reconciles with each other.
+inventory, quoting, invoicing, and core accounting in one self-hosted
+application, so an SMB owner runs their whole operation without stitching
+together a CRM tool, a spreadsheet-based inventory count, and a separate
+accounting package that never quite reconciles with each other.
 
 ## 2. Purpose
 
@@ -129,37 +129,65 @@ Inherits the baseline in
 ZodiBusiness-specific additions:
 
 - Financial reports (trial balance, P&L) must generate for a 12-month range
-  in under 5 seconds for a tenant with up to 500,000 journal lines.
+  in under 5 seconds for a deployment with up to 500,000 journal lines.
 - Ledger posting is transactionally atomic — a payment that touches both
   accounts receivable and cash must never leave the books unbalanced, even
   under partial failure.
 
 ## 11. Architecture
 
-ZodiBusiness is a tenant application on [ZodiCore](../ZodiCore/SPEC.md),
-consuming identity, permissions, billing (for the SMB's own subscription),
-and notifications via the shared Composer packages per
-[architecture/overview.md](../../architecture/overview.md). CRM, inventory,
-and accounting are distinct modules within the same modular monolith sharing
-one Postgres schema per tenant, deliberately avoiding a microservice split
-between "CRM" and "accounting" because the quote-to-cash flow requires
-strict transactional consistency between them (a paid invoice and its
-journal entry must commit together). Multi-company/multi-branch support
-follows [multi-tenancy.md](../../architecture/multi-tenancy.md), letting a
-single SMB tenant operate multiple legal entities with consolidated and
-per-entity reporting.
+ZodiBusiness — the first product in the build order
+([ROADMAP.md](../../../ROADMAP.md)) — is built by cloning the sanitized base
+codebase and running the
+[genericization checklist](../../architecture/product-genericization-checklist.md).
+Because ZodiBusiness's own shape (users, wallet, plans, accounting-adjacent
+records) is the closest fit to the base codebase as audited, this clone is
+the reference example every other product's genericization pass follows: the
+banking-specific `loans`/`dps`/`fdr`/`branches`/`branch_staff`/
+`other_banks`/`beneficiaries`/`airtime` tables are stripped (none of them
+serve an SMB CRM/inventory/accounting product), and the `branch_staff` guard
+is dropped by default, per
+[product-genericization-checklist.md](../../architecture/product-genericization-checklist.md#step-2--strip-banking-domain-specific-tables-models-and-controllers).
+ZodiBusiness inherits the base engine's wallet/ledger, payment gateways
+(§22), RBAC/auth, KYC, i18n, and admin configuration surface unmodified —
+see
+[base-codebase-strategy.md](../../architecture/base-codebase-strategy.md) —
+and layers its own CRM, Inventory, Sales, Expenses, Accounting, and
+Procurement modules (§13) on top, per
+[base-codebase-strategy.md](../../architecture/base-codebase-strategy.md#layering-a-products-domain-modules-onto-the-sanitized-base).
+
+CRM, inventory, and accounting are distinct modules within the same modular
+monolith and the same one database of the buyer's single deployment —
+deliberately avoiding a microservice split between "CRM" and "accounting"
+because the quote-to-cash flow requires strict transactional consistency
+between them (a paid invoice and its journal entry must commit together in
+one Laravel database transaction), per
+[overview.md](../../architecture/overview.md#modular-monolith-one-codebase-per-product).
+There is no shared tenant boundary and no ZodiCore platform dependency: each
+ZodiBusiness deployment is one SMB's standalone, self-hosted instance, per
+[single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md).
+Multi-company/multi-branch support — letting a single SMB operate multiple
+legal entities with consolidated and per-entity reporting — is scoping
+within this one deployment, via the `company_id`/`branch_id` model in §14,
+per
+[localization-i18n.md](../../standards/localization-i18n.md#multi-company--multi-branch-data-scoping),
+never tenancy.
 
 ## 12. Technology
 
-Laravel (PHP) + Vue per
-[coding-standards-php-laravel.md](../../development/coding-standards-php-laravel.md)
-and [coding-standards-vue.md](../../development/coding-standards-vue.md);
-PostgreSQL + Redis per
+Laravel (PHP) per the base codebase's stack (Laravel 11, PHP ^8.3, Vite 5) —
+see
+[base-codebase-strategy.md](../../architecture/base-codebase-strategy.md) —
+following
+[coding-standards-php-laravel.md](../../development/coding-standards-php-laravel.md);
+MySQL/MariaDB + Redis (where the buyer's hosting supports it, with a file/DB
+cache fallback) per
 [database-standards.md](../../development/database-standards.md); a
 dedicated append-only `journal_entries` ledger table enforced at the
 database layer to be immutable once posted (corrections via reversing entry,
-never edited in place, mirroring [ZodiCore §20](../ZodiCore/SPEC.md#20-payment-gateways-wallet-accounting-taxes-invoices)'s
-invoice-immutability pattern).
+never edited in place), mirroring the inherited wallet engine's own
+append-only `Transaction` pattern documented in
+[wallet-system.md](../../standards/wallet-system.md).
 
 ## 13. Modules & Submodules
 
@@ -177,21 +205,31 @@ invoice-immutability pattern).
 
 | Entity | Key columns |
 |---|---|
-| `leads` | id, tenant_id, name, source, status, owner_id, created_at |
-| `deals` | id, tenant_id, contact_id, pipeline_stage, value, expected_close_date |
-| `contacts` | id, tenant_id, company_id, name, email, phone |
-| `products` | id, tenant_id, sku, name, unit_cost, unit_price, is_stocked |
-| `warehouses` | id, tenant_id, name, address |
+| `companies` | id, name, legal_entity_name, default_currency, is_active |
+| `branches` | id, company_id, name, address, is_active |
+| `leads` | id, company_id, name, source, status, owner_id, created_at |
+| `deals` | id, company_id, contact_id, pipeline_stage, value, expected_close_date |
+| `contacts` | id, company_id, name, email, phone |
+| `products` | id, company_id, sku, name, unit_cost, unit_price, is_stocked |
+| `warehouses` | id, branch_id, name, address |
 | `stock_levels` | id, product_id, warehouse_id, quantity_on_hand, reorder_point |
-| `quotes` | id, tenant_id, deal_id, status, total, accepted_at |
-| `invoices` | id, tenant_id, customer_id, quote_id, status, due_date, balance_due |
+| `quotes` | id, company_id, deal_id, status, total, accepted_at |
+| `invoices` | id, company_id, customer_id, quote_id, status, due_date, balance_due |
 | `invoice_items` | id, invoice_id, product_id, quantity, unit_price |
-| `expenses` | id, tenant_id, submitted_by, amount, category, status, approved_by |
-| `chart_of_accounts` | id, tenant_id, code, name, type (asset/liability/equity/revenue/expense) |
-| `journal_entries` | id, tenant_id, entry_date, reference, posted_at, period_id |
+| `expenses` | id, company_id, submitted_by, amount, category, status, approved_by |
+| `chart_of_accounts` | id, company_id, code, name, type (asset/liability/equity/revenue/expense) |
+| `journal_entries` | id, company_id, entry_date, reference, posted_at, period_id |
 | `journal_lines` | id, journal_entry_id, account_id, debit, credit |
-| `purchase_orders` | id, tenant_id, vendor_id, status, total, expected_at |
-| `vendors` | id, tenant_id, name, terms, payment_method |
+| `purchase_orders` | id, company_id, vendor_id, status, total, expected_at |
+| `vendors` | id, company_id, name, terms, payment_method |
+
+`companies` and `branches` model the multi-legal-entity/multi-branch scoping
+an SMB may need within its one deployment (§11), per
+[localization-i18n.md](../../standards/localization-i18n.md#multi-company--multi-branch-data-scoping) —
+a single-entity SMB has exactly one seeded `companies` row and, typically,
+one `branches` row. Consolidated reporting aggregates across a business's own
+`companies`/`branches`; there is no cross-business aggregation, because there
+is no other business's data in the same deployment.
 
 ## 15. Key API Endpoints
 
@@ -242,13 +280,22 @@ All channels follow
 
 ## 18. Permissions & Roles
 
-Extends ZodiCore's default roles
-([rbac-permissions.md](../../security/rbac-permissions.md#default-system-roles))
-with: `deals.manage`, `inventory.adjust`, `invoices.issue`,
-`payments.record`, `expenses.approve`, `journal_entries.post`,
-`period.close`, `purchase_orders.approve`. `journal_entries.post` and
-`period.close` are restricted to the `Owner` and a dedicated `Accountant`
-role by default — no `Member`-level role can post to the ledger.
+Built on the base engine's inherited `Role`/`Permission` RBAC (not Spatie),
+per
+[admin-template.md](../../templates/admin-template.md#roles--permissions-inherited-not-spatie).
+ZodiBusiness's `DemoSeeder` ships its own default admin roles — Owner,
+Sales Rep, Operations/Inventory Manager, and Bookkeeper/Accountant — each
+granted a subset of ZodiBusiness's product-specific permissions:
+`deals.manage`, `inventory.adjust`, `invoices.issue`, `payments.record`,
+`expenses.approve`, `journal_entries.post`, `period.close`,
+`purchase_orders.approve`. `journal_entries.post` and `period.close` are
+restricted to the `Owner` and `Bookkeeper/Accountant` roles by default — no
+Sales Rep-level role can post to the ledger. As the reference product for
+this pipeline, ZodiBusiness's role set is the example other product specs
+follow for their own default-role definitions; a business owner can create
+additional custom roles and reassign any permission from the admin panel
+with no code change, per
+[admin-configuration-baseline.md](../../standards/admin-configuration-baseline.md#roles--permissions).
 
 ## 19. Workflows & Approval Chains
 
@@ -267,25 +314,30 @@ role by default — no `Member`-level role can post to the ledger.
 ## 20. Audit Logs
 
 Every deal-stage change, invoice issuance/edit, journal entry post/reversal,
-expense approval decision, and period close/reopen is recorded to ZodiCore's
-shared audit log with actor, before/after state, and IP/device context, per
-[audit-logging.md](../../security/audit-logging.md). Journal entries are
-themselves append-only, so the audit log and the ledger are mutually
-reinforcing records.
+expense approval decision, and period close/reopen is recorded to this
+deployment's own audit log with actor, before/after state, and IP/device
+context, per [audit-logging.md](../../security/audit-logging.md). Journal
+entries are themselves append-only, so the audit log and the ledger are
+mutually reinforcing records.
 
 ## 21. Reports & Analytics & Dashboards
 
 Sales pipeline funnel and win-rate by rep, AR/AP aging, cash-flow forecast
 (based on open invoices and scheduled bill payments), inventory valuation
-(FIFO/weighted-average configurable per tenant), P&L and balance sheet, and
+(FIFO/weighted-average configurable per business), P&L and balance sheet, and
 an owner-facing "business health" dashboard combining pipeline, cash
 position, and overdue invoices. Dashboard-builder and scheduled-report
 capability per [dashboard-standards.md](../../standards/dashboard-standards.md).
 
 ## 22. Integrations
 
-- **Payment processing**: Stripe, PayPal, ACH via the `PaymentGatewayContract`
-  abstraction from [ZodiCore §20](../ZodiCore/SPEC.md#20-payment-gateways-wallet-accounting-taxes-invoices).
+- **Payment gateways**: the inherited gateway catalog documented in
+  [payment-gateways.md](../../standards/payment-gateways.md) — Stripe and
+  Authorize.Net for card processing, Mollie and Razorpay for EU/India-focused
+  SMBs, Flutterwave and Paystack for SMBs in Zodize's primary African market,
+  and the native manual/offline gateway for bank-transfer/cash invoice
+  settlement. A business owner enables and configures only the gateways
+  relevant to their market entirely from the admin panel — no code change.
 - **Bank feeds**: Plaid-class bank-connection integration for automatic
   transaction import into reconciliation.
 - **Tax filing prep**: export formats compatible with common SMB tax-prep
@@ -314,7 +366,7 @@ capability per [dashboard-standards.md](../../standards/dashboard-standards.md).
 
 ## 25. Seed/Demo Data
 
-`DemoSeeder` provisions a demo SMB tenant with a populated pipeline (leads
+`DemoSeeder` provisions a demo SMB deployment with a populated pipeline (leads
 through won/lost deals), a 2-warehouse inventory with realistic stock
 levels, 12 months of invoice/payment history including at least one overdue
 invoice, a standard chart of accounts with populated journal history, and 3
@@ -400,8 +452,16 @@ transaction volume before go-live.
 
 ## Roadmap (spec depth)
 
-This spec is Foundation-depth. Queued for Deep-depth expansion: a full ER
-diagram covering multi-entity consolidation and lot/serial tracking tables,
-the complete endpoint catalog (bulk journal import, full financial statement
-endpoint set), and a dedicated `DATA_MODEL.md`/`API_REFERENCE.md` pair
-matching [ZodiCore](../ZodiCore/SPEC.md)'s companion-document structure.
+This spec is Foundation-depth. Its Architecture and Core Data Model sections
+were revised to the standalone, self-hosted, single-tenant base-codebase
+model described in
+[architecture/overview.md](../../architecture/overview.md) and
+[single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md);
+ZodiBusiness is the first product in the build order
+([ROADMAP.md](../../../ROADMAP.md)) and the reference example other product
+teams follow for their own clone → genericize → bridge → extend pass. Queued
+for Deep-depth expansion: a full ER diagram covering multi-entity
+consolidation and lot/serial tracking tables, the complete endpoint catalog
+(bulk journal import, full financial statement endpoint set), and a
+dedicated `DATA_MODEL.md`/`API_REFERENCE.md` pair matching
+[ZodiCore](../ZodiCore/SPEC.md)'s companion-document structure.

@@ -7,9 +7,12 @@ Accepted
 ## Context
 
 The Zodize Engineering Handbook exists to be the single source of truth for
-how roughly twenty enterprise SaaS products are built on a shared Laravel +
-Vue stack, on top of a shared platform (ZodiCore) providing identity,
-billing, tenancy, notifications, plugins, and permissions, per
+how roughly twenty standalone, self-hosted Laravel products are built — each
+one an independent single-tenant application cloned from one audited base
+codebase that already provides identity, wallet/billing, notifications,
+plugins, and permissions (see
+[`../architecture/base-codebase-strategy.md`](../architecture/base-codebase-strategy.md)),
+not a shared platform any product depends on at runtime, per
 [`../../README.md`](../../README.md). Two related problems needed to be
 solved before any global standard or product specification could be written
 in good faith:
@@ -58,7 +61,7 @@ ratifying [`../../ROADMAP.md`](../../ROADMAP.md) Phase 1:
 
 ```
 docs/
-  architecture/   System architecture, multi-tenancy, plugin/marketplace architecture.
+  architecture/   System architecture, single-tenant deployment model, plugin/marketplace architecture.
   design-system/  Brand, typography, color, spacing, components, motion, dark theme.
   development/    Coding standards, API standards, database standards, git workflow.
   security/       AuthN/AuthZ, RBAC, audit logging, data protection, DR.
@@ -122,12 +125,11 @@ since it is the founding structural decision of the handbook itself.
   conflicts across concurrent PRs touching unrelated decisions.
 - **A flatter repository layout (e.g. all standards in one `docs/standards/`
   directory, no separate `security/`, `quality/`, `architecture/`
-  directories).** Rejected: a shared platform serving twenty products across
-  domains as varied as banking and healthcare requires enough depth per
-  concern (security alone spans authN/authZ, RBAC, audit logging, data
-  protection, and disaster recovery) that a flat layout would force any one
-  directory to become unnavigable well before the handbook's content is
-  complete.
+  directories).** Rejected: twenty independent products spanning domains as
+  varied as banking and healthcare require enough depth per concern
+  (security alone spans authN/authZ, RBAC, audit logging, data protection,
+  and disaster recovery) that a flat layout would force any one directory to
+  become unnavigable well before the handbook's content is complete.
 - **Organize by product instead of by concern at the top level.** Rejected:
   the explicit goal of this handbook is that standards are shared and
   inherited across products, per [`../../README.md`](../../README.md);

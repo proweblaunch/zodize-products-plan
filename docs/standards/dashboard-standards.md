@@ -61,7 +61,7 @@ Sparkline (optional but REQUIRED when the underlying data has a
 - Stat tiles MUST render a skeleton state (per
   [`card-standards.md`](./card-standards.md#skeleton-loading-state)) while
   the metric is loading, and MUST NOT show a stale value from a previous
-  tenant/session during load.
+  session during load.
 
 ## Default dashboard — never empty
 
@@ -69,11 +69,11 @@ A dashboard showing no data on first login is a Definition-of-Done defect.
 Every product MUST define a default dashboard configuration that is never
 empty, resolved in this priority order:
 
-1. **Real data, if any exists** — if the tenant already has data (e.g. an
+1. **Real data, if any exists** — if the business already has data (e.g. an
    existing account with transactions), the dashboard renders real KPIs and
    charts immediately.
-2. **Guided onboarding state** — if the tenant is new and has no data yet
-   for a given widget, that widget renders an onboarding variant of itself:
+2. **Guided onboarding state** — if the deployment is new and has no data
+   yet for a given widget, that widget renders an onboarding variant of itself:
    the same card chrome and layout position, but with a zero-state
    illustration, one sentence explaining what will appear here, and a
    direct call-to-action button to create the first relevant record (e.g. a
@@ -137,7 +137,9 @@ Every product's dashboard MUST support user-level customization:
   on the value when it changes, lasting 600ms, to draw attention without
   being distracting.
 - Widgets backed by data that is expensive to compute (aggregate reports,
-  cross-tenant rollups) MAY use a polling refresh at a minimum interval of
+  cross-branch rollups per
+  [`localization-i18n.md`](./localization-i18n.md#multi-company--multi-branch-data-scoping))
+  MAY use a polling refresh at a minimum interval of
   60 seconds instead of real-time push, but MUST still show the last-updated
   timestamp and MUST offer a manual "Refresh" icon button in the widget
   header for the user to force an update on demand.

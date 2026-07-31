@@ -46,7 +46,8 @@ skipping it.
       filter/sort fields.
 - [ ] Any new or changed table follows
       [`../development/database-standards.md`](../development/database-standards.md)
-      and, if tenant-scoped, carries `tenant_id` per
+      and, if company/branch-scoped, carries the `company_id`/`branch_id`
+      foreign key per
       [`../templates/database-template.md`](../templates/database-template.md).
 - [ ] Any new permission is registered per
       [`../templates/permission-template.md`](../templates/permission-template.md),

@@ -15,8 +15,11 @@ A reviewer must check, in order of priority:
 1. **Correctness against the spec** — does this match the relevant
    [product spec](../products/) section or handbook standard it claims to
    implement?
-2. **Security** — authorization checks present and correct, tenant scoping
-   present, no secrets, no injection risk (SQL/XSS/SSRF), per
+2. **Security** — authorization checks present and correct, multi-company/
+   multi-branch scoping present where the product's data model requires it
+   (see
+   [localization-i18n.md](../standards/localization-i18n.md#multi-company--multi-branch-data-scoping)),
+   no secrets, no injection risk (SQL/XSS/SSRF), per
    [security-standards.md](../security/security-standards.md).
 3. **Test coverage of the mandatory cases** in
    [testing-standards.md](./testing-standards.md#non-negotiable-test-cases).

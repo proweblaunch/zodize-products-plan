@@ -22,7 +22,7 @@ what is documented in this repository, the linked design system at
 | [`PRODUCT_CATALOG.md`](./PRODUCT_CATALOG.md) | Every Zodize product, one-line pitch, market, and status. |
 | [`CHANGELOG.md`](./CHANGELOG.md) | Notable changes to the handbook itself (not to any product). |
 | [`CONTRIBUTING.md`](./CONTRIBUTING.md) | How to propose a change to a standard. |
-| [`docs/architecture/`](./docs/architecture) | System architecture, multi-tenancy, plugin/marketplace architecture. |
+| [`docs/architecture/`](./docs/architecture) | System architecture, the single-tenant deployment model, base codebase strategy, plugin/marketplace architecture. |
 | [`docs/design-system/`](./docs/design-system) | Brand, typography, color, spacing, components, motion, dark theme. |
 | [`docs/development/`](./docs/development) | Coding standards, API standards, database standards, git workflow. |
 | [`docs/security/`](./docs/security) | AuthN/AuthZ, RBAC, audit logging, data protection, DR. |

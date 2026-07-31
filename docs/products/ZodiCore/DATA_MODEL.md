@@ -1,148 +1,243 @@
 # ZodiCore — Data Model
 
 Companion to [SPEC.md](./SPEC.md). Conforms to
-[database-standards.md](../../development/database-standards.md): UUID v7
-primary keys, `tenant_id` scoping, `created_at`/`updated_at`/`deleted_at` on
-every table (omitted from the column lists below for brevity — assume
-present on every table unless noted).
+[database-standards.md](../../development/database-standards.md). This is
+one buyer's one deployment's schema — there is no `tenant_id` column
+anywhere in it, per
+[single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md).
+`created_at`/`updated_at`/`deleted_at` are present on every table unless
+noted, and are omitted from the column lists below for brevity.
+
+## Why there is no `tenants` table
+
+Earlier drafts of this document modeled `tenants`, `subscriptions`,
+`invoices`, and `payment_methods` as a SaaS billing schema, because ZodiCore
+was wrongly assumed to bill other Zodize products' customer organizations.
+Zodize does not operate ZodiCore (or any product) as a hosted service, and
+does not bill a buyer on an ongoing subscription basis — a buyer purchases
+the source code once and owns the deployment forever, per
+[overview.md](../../architecture/overview.md#the-business-model-this-architecture-serves).
+There is therefore no `tenants` table, no recurring `subscriptions`/
+`invoices` billing-of-the-buyer schema, and no `payment_methods` table for
+Zodize to charge the buyer. The `plans`/`gateways`/`transactions` tables
+that do exist model the buyer's *own* business selling to *their own* end
+customers — an entirely different relationship than Zodize-to-buyer.
 
 ## Entity-relationship diagram
 
 ```mermaid
 erDiagram
-    TENANTS ||--o{ COMPANIES : has
-    COMPANIES ||--o{ BRANCHES : has
-    TENANTS ||--o{ USERS : has
-    TENANTS ||--o{ ROLES : defines
-    ROLES ||--o{ ROLE_USER : assigned_via
+    USERS ||--o{ TRANSACTIONS : has
     USERS ||--o{ ROLE_USER : has
+    ROLES ||--o{ ROLE_USER : assigned_via
     ROLES ||--o{ ROLE_PERMISSION : grants
     PERMISSIONS ||--o{ ROLE_PERMISSION : granted_via
-    TENANTS ||--o{ SUBSCRIPTIONS : has
-    PLANS ||--o{ SUBSCRIPTIONS : defines
-    SUBSCRIPTIONS ||--o{ INVOICES : generates
-    TENANTS ||--o{ PAYMENT_METHODS : owns
-    TENANTS ||--o{ API_TOKENS : issues
-    TENANTS ||--o{ WEBHOOKS : registers
-    WEBHOOKS ||--o{ WEBHOOK_DELIVERIES : produces
-    TENANTS ||--o{ AUDIT_LOGS : generates
+    USERS ||--o{ WITHDRAWALS : requests
+    WITHDRAW_METHODS ||--o{ WITHDRAWALS : used_by
+    GATEWAYS ||--o{ GATEWAY_CURRENCIES : supports
+    PLANS ||--o{ USERS : subscribed_via_plan_id
+    USERS ||--o{ KYC_DATA : submits
+    FORMS ||--o{ KYC_DATA : defines_schema_for
+    LANGUAGES ||--o{ TRANSLATIONS : has
+    FRONTENDS ||--o{ PAGES : contains
     USERS ||--o{ AUDIT_LOGS : performs
-    TENANTS ||--o{ NOTIFICATIONS : receives
-    USERS ||--o{ NOTIFICATIONS : receives
-    TENANTS ||--o{ TENANT_PLUGINS : installs
-    PLUGINS ||--o{ TENANT_PLUGINS : installed_as
-    TENANTS ||--o{ TENANT_FEATURE_FLAGS : overrides
-    FEATURE_FLAGS ||--o{ TENANT_FEATURE_FLAGS : overridden_by
+    USERS ||--o{ PROJECTS : owns
+    PROJECTS ||--o{ TASKS : contains
+    TASKS ||--o{ TASK_COMMENTS : has
+    TASKS ||--o{ TASK_ATTACHMENTS : has
+    USERS ||--o{ RECORD_TYPES : defines
+    RECORD_TYPES ||--o{ RECORDS : instantiates
+    PLUGINS ||--o{ INSTALLED_PLUGINS : installed_as
+    USERS ||--o{ WEBHOOKS : registers
+    WEBHOOKS ||--o{ WEBHOOK_DELIVERIES : produces
 ```
 
-## Core tables
+## Inherited base engine tables
 
-### `tenants`
+These tables come from the sanitized base codebase unmodified, per
+[base-codebase-strategy.md](../../architecture/base-codebase-strategy.md).
+ZodiCore's genericization pass strips the banking-specific tables (`loans`,
+`dps`, `fdr`, `branches`/`branch_staff`, `other_banks`, `beneficiaries`,
+`airtime_operators`) and keeps everything below.
+
+### `general_settings`
 | Column | Type | Notes |
 |---|---|---|
-| id | uuid | PK |
-| name | varchar | |
-| slug | varchar | unique, used for subdomain |
-| status | enum | `trial`, `active`, `suspended`, `canceled` |
-| plan_id | uuid | FK → plans, current active plan |
-| billing_email | varchar | |
-| custom_domain | varchar nullable | |
-| trial_ends_at | timestamptz nullable | |
-
-### `companies`
-| Column | Type | Notes |
-|---|---|---|
-| id | uuid | PK |
-| tenant_id | uuid | FK → tenants |
-| name | varchar | |
-| legal_name | varchar nullable | |
-| tax_id | varchar nullable | |
-| default_currency | char(3) | ISO 4217 |
-
-### `branches`
-| Column | Type | Notes |
-|---|---|---|
-| id | uuid | PK |
-| company_id | uuid | FK → companies |
-| tenant_id | uuid | FK → tenants (denormalized for scope queries) |
-| name | varchar | |
-| address_json | jsonb | |
+| id | bigint | PK, single row |
+| site_name | varchar | |
+| logo_path | varchar | |
+| favicon_path | varchar | |
+| cur_text | varchar | base currency code |
+| cur_sym | varchar | base currency symbol |
 | timezone | varchar | IANA tz name |
+| socialite_json | json | social login provider config |
 
 ### `users`
 | Column | Type | Notes |
 |---|---|---|
-| id | uuid | PK |
-| tenant_id | uuid | FK → tenants |
-| email | varchar | unique per tenant |
-| password_hash | varchar nullable | null for SSO-only users |
-| mfa_enabled | boolean | |
-| status | enum | `invited`, `active`, `suspended` |
-| last_login_at | timestamptz nullable | |
+| id | bigint | PK |
+| name | varchar | |
+| email | varchar | unique |
+| password | varchar | hashed |
+| balance | decimal | current wallet balance, minor-units precision |
+| ref_by | bigint nullable | FK → users, referral tree parent |
+| kyc_data | json nullable | latest submitted KYC payload |
+| kyc_status | enum | `unverified`, `pending`, `verified`, `rejected` |
+| status | enum | `active`, `suspended` |
+
+No `tenant_id` — every row belongs to this one deployment's one business.
+
+### `transactions`
+| Column | Type | Notes |
+|---|---|---|
+| id | bigint | PK |
+| user_id | bigint | FK → users |
+| amount | decimal | signed — positive credit, negative debit |
+| post_balance | decimal | user's balance immediately after this row |
+| trxn_type | varchar | deposit, withdrawal, transfer, referral_commission, admin_adjustment, task/record-triggered types added by ZodiCore's own modules |
+| remark | varchar | |
+| created_at | timestamptz | append-only, no `updated_at` mutation path |
+
+Append-only per [wallet-system.md](../../standards/wallet-system.md) — a
+correction is a new offsetting row, never an edit to a past one.
+
+### `balance_transfers`
+| Column | Type | Notes |
+|---|---|---|
+| id | bigint | PK |
+| sender_id | bigint | FK → users |
+| receiver_id | bigint | FK → users |
+| amount | decimal | |
+| sender_transaction_id | bigint | FK → transactions |
+| receiver_transaction_id | bigint | FK → transactions |
 
 ### `roles`, `permissions`, `role_permission`, `role_user`
-Per [rbac-permissions.md](../../security/rbac-permissions.md). `roles.tenant_id`
-nullable for system-default roles shared across tenants;
-`permissions.key` is the `resource.action` string (e.g. `invoices.create`).
+Per [rbac-permissions.md](../../security/rbac-permissions.md). Custom
+first-party RBAC (not Spatie), inherited from the base engine's `Role`/
+`Permission` models. `permissions.key` is the `resource.action` string
+(e.g. `withdrawals.approve`).
 
-### `subscriptions`, `plans`, `invoices`, `payment_methods`
+### `gateways`, `gateway_currencies`
 | Table | Key columns |
 |---|---|
-| plans | `id`, `code`, `name`, `price_minor_units`, `currency`, `billing_interval`, `entitlements_json` |
-| subscriptions | `id`, `tenant_id`, `plan_id`, `status`, `current_period_start`, `current_period_end`, `cancel_at_period_end` |
-| invoices | `id`, `tenant_id`, `subscription_id`, `number`, `status`, `subtotal_minor_units`, `tax_minor_units`, `total_minor_units`, `currency`, `issued_at`, `due_at`, `paid_at` |
-| payment_methods | `id`, `tenant_id`, `gateway`, `gateway_reference`, `type`, `is_default` |
+| gateways | `id`, `name`, `is_active`, `credentials_json` |
+| gateway_currencies | `id`, `gateway_id`, `currency_code`, `conversion_rate` |
 
-### `notifications`, `notification_preferences`
+See [payment-gateways.md](../../standards/payment-gateways.md).
+
+### `withdraw_methods`, `withdrawals`
 | Table | Key columns |
 |---|---|
-| notifications | `id`, `tenant_id`, `user_id`, `type`, `channel`, `payload_json`, `read_at`, `sent_at` |
-| notification_preferences | `id`, `user_id`, `notification_type`, `channel`, `enabled` |
+| withdraw_methods | `id`, `name`, `input_form_schema_json`, `min_amount`, `max_amount`, `fee` |
+| withdrawals | `id`, `user_id`, `withdraw_method_id`, `amount`, `status`, `submitted_data_json`, `approved_by`, `approved_at`, `transaction_id` |
+
+### `plans`
+| Column | Type | Notes |
+|---|---|---|
+| id | bigint | PK |
+| name | varchar | |
+| description | text | |
+| price_or_rate | decimal | |
+| term | varchar nullable | |
+| limits_json | json | |
+| features_json | json | |
+| is_active | boolean | |
+
+The genericized `Plan` pattern per
+[base-codebase-strategy.md](../../architecture/base-codebase-strategy.md#genericizing-the-plan-pattern) —
+a buyer-configured offering their own end users purchase, not a
+Zodize-to-buyer billing plan.
+
+### `forms`, `kyc_data`
+| Table | Key columns |
+|---|---|
+| forms | `id`, `name`, `fields_schema_json` |
+| (on `users`) | `kyc_data` (submitted values), `kyc_status` |
+
+### `languages`
+| Column | Type | Notes |
+|---|---|---|
+| id | bigint | PK |
+| code | varchar | e.g. `en`, `ar`, `fr` |
+| name | varchar | |
+| is_default | boolean | |
+| is_active | boolean | |
+
+Translation strings live in `core/lang/{code}.json`, not a database table —
+see [localization-i18n.md](../../standards/localization-i18n.md).
+
+### `frontends`, `pages`
+| Table | Key columns |
+|---|---|
+| frontends | `id`, `slug`, `sections_json`, `seo_json` |
+| pages | `id`, `frontend_id`, `title`, `content`, `is_published` |
+
+See [frontend-backend-bridge.md](../../architecture/frontend-backend-bridge.md).
 
 ### `audit_logs`
 | Column | Type | Notes |
 |---|---|---|
-| id | uuid | PK |
-| tenant_id | uuid | FK |
-| actor_user_id | uuid nullable | null for system-initiated actions |
-| acted_as_user_id | uuid nullable | set during impersonation |
+| id | bigint | PK |
+| actor_user_id | bigint nullable | null for system-initiated actions |
 | action | varchar | `resource.action` |
 | subject_type | varchar | |
-| subject_id | uuid | |
-| before_json | jsonb nullable | |
-| after_json | jsonb nullable | |
-| ip_address | inet | |
+| subject_id | bigint | |
+| before_json | json nullable | |
+| after_json | json nullable | |
+| ip_address | varchar | |
 | user_agent | varchar | |
 | occurred_at | timestamptz | append-only, no `updated_at` |
 
-Append-only: no application code path issues an `UPDATE` or `DELETE`
-against `audit_logs`; enforced by a database-level trigger denying those
-statements for all application roles except a break-glass admin role used
-only for legally-mandated redaction with its own audit trail.
+Append-only per [audit-logging.md](../../security/audit-logging.md).
 
-### `plugins`, `tenant_plugins`
+## ZodiCore's own domain tables
+
+### `projects`, `tasks`, `task_comments`, `task_attachments`
 | Table | Key columns |
 |---|---|
-| plugins | `id`, `slug`, `name`, `vendor`, `manifest_json`, `status` (marketplace listing status) |
-| tenant_plugins | `id`, `tenant_id`, `plugin_id`, `status`, `granted_scopes_json`, `installed_at` |
+| projects | `id`, `name`, `owner_id`, `status` |
+| tasks | `id`, `project_id`, `title`, `assignee_id`, `due_date`, `priority`, `status` |
+| task_comments | `id`, `task_id`, `user_id`, `body` |
+| task_attachments | `id`, `task_id`, `file_path`, `uploaded_by` |
 
-### `api_tokens`, `webhooks`, `webhook_deliveries`
+### `record_types`, `records`
 | Table | Key columns |
 |---|---|
-| api_tokens | `id`, `tenant_id`, `user_id`, `name`, `token_hash`, `abilities_json`, `last_used_at`, `expires_at` |
-| webhooks | `id`, `tenant_id`, `target_url`, `signing_secret_hash`, `event_types_json`, `status` |
+| record_types | `id`, `name`, `fields_schema_json` (same dynamic-schema pattern as `forms`) |
+| records | `id`, `record_type_id`, `data_json`, `created_by` |
+
+## Optional plugin/marketplace tables
+
+Present only in a ZodiCore deployment whose buyer has the plugin system
+enabled, per
+[plugin-architecture.md](../../architecture/plugin-architecture.md) and
+[marketplace-architecture.md](../../architecture/marketplace-architecture.md).
+
+### `plugins`, `installed_plugins`
+| Table | Key columns |
+|---|---|
+| plugins | `id`, `slug`, `name`, `vendor`, `manifest_json` — the marketplace listing catalog this deployment's admin panel fetched |
+| installed_plugins | `id`, `plugin_id`, `status`, `granted_scopes_json`, `installed_at` — installs into *this deployment only* |
+
+### `webhooks`, `webhook_deliveries`
+
+Buyer-configured endpoints for the buyer's own integrations (not a
+Zodize-to-Zodize or cross-deployment webhook system):
+
+| Table | Key columns |
+|---|---|
+| webhooks | `id`, `target_url`, `signing_secret_hash`, `event_types_json`, `status` |
 | webhook_deliveries | `id`, `webhook_id`, `event_id`, `response_status`, `response_body`, `attempt_count`, `delivered_at` |
 
-### `feature_flags`, `tenant_feature_flags`
-| Table | Key columns |
-|---|---|
-| feature_flags | `id`, `key`, `description`, `default_enabled`, `owner`, `created_at`, `planned_removal_at` |
-| tenant_feature_flags | `id`, `tenant_id`, `feature_flag_id`, `enabled`, `reason` |
+## Data scoping
 
-## Cross-tenant isolation guarantee
-
-Every table above except `plans`, `permissions` (system-defined), and
-`feature_flags` (definitions, not values) carries `tenant_id` and is covered
-by the mandatory global scope and cross-tenant isolation test suite defined
-in [multi-tenancy.md](../../architecture/multi-tenancy.md) and
-[testing-standards.md](../../development/testing-standards.md#non-negotiable-test-cases).
+Every table above belongs to this one deployment. A buyer running multiple
+companies/branches under one deployment scopes the relevant tables via
+`company_id`/`branch_id`, per
+[localization-i18n.md](../../standards/localization-i18n.md#multi-company--multi-branch-data-scoping) —
+ZodiCore does not ship this scoping layer enabled by default, since a plain
+back-office deployment has no built-in multi-branch concept, but the
+`companies`/`branches` pattern is available to any product (including a
+buyer's own extension of ZodiCore) that needs it. There is no cross-tenant
+isolation test category for this data model, per
+[single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md#what-single-tenant-changes-in-the-data-model).

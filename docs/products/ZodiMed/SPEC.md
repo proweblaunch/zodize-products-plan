@@ -46,10 +46,10 @@ hospital/ASC operations.
 
 | Capability | Comparable to | Zodize differentiation |
 |---|---|---|
-| EHR + clinical documentation | Epic, athenahealth, Cerner (Oracle Health) | Right-sized for clinics that don't need Epic-scale implementation, built on the same shared enterprise-grade core as every other Zodize product |
+| EHR + clinical documentation | Epic, athenahealth, Cerner (Oracle Health) | Right-sized for clinics that don't need Epic-scale implementation, sold as source code the practice owns and self-hosts, built on the same audited base engine every Zodize product is cloned from |
 | Practice management/scheduling | athenahealth, DrChrono, Kareo | Scheduling and billing share one data model — no separate PM/EHR sync problem |
 | Patient portal | MyChart, athenahealth Patient Portal | Same design system and portal shell used across every Zodize product, lowering per-product build cost |
-| Billing/claims (CPT/ICD) | Kareo, AdvancedMD | Claims workflow built on ZodiCore's audit trail for payer dispute defense |
+| Billing/claims (CPT/ICD) | Kareo, AdvancedMD | Claims workflow built on ZodiMed's own immutable audit trail for payer dispute defense |
 | E-prescribing | DrFirst, Surescripts-integrated EHRs | Standards-based Surescripts integration rather than a proprietary network |
 
 ## 6. Personas
@@ -147,31 +147,62 @@ inherited baseline. ZodiMed-specific additions:
 - E-prescribing transmission acknowledgment surfaced to the provider within
   the network's SLA, with a clear pending/failed state — never a silent
   failure.
-- 99.9% uptime target for scheduling and charting during configured clinic
-  operating hours per tenant.
+- 99.9% uptime target for scheduling and charting during the clinic's
+  configured operating hours.
 
 ## 11. Architecture
 
-ZodiMed is a tenant application on [ZodiCore](../ZodiCore/SPEC.md),
-consuming `zodize/core-identity`, `zodize/core-billing`,
-`zodize/core-notifications`, `zodize/core-permissions`, and
-`zodize/core-plugins` per ZodiCore's
-[Architecture](../ZodiCore/SPEC.md#11-architecture) section. ZodiMed adds a
-`PHIAccessContract` layered on top of ZodiCore's RBAC engine that enforces
-minimum-necessary access at query time (care-team scoping, break-glass
-justification capture) rather than relying on role assignment alone — every
-PHI read is authorized twice: once by RBAC permission, once by the
-care-relationship check. Clinical, billing, and lab-integration modules are
-Laravel domains within the tenant application; multi-location clinic groups
-map onto ZodiCore's tenant/company/branch hierarchy per
-[multi-tenancy.md](../../architecture/multi-tenancy.md).
+ZodiMed is a standalone, self-hosted Laravel application, built by cloning
+the sanitized base codebase and running the
+[genericization checklist](../../architecture/product-genericization-checklist.md)
+per
+[base-codebase-strategy.md](../../architecture/base-codebase-strategy.md).
+The clone strips every banking-specific table that doesn't apply to a
+clinical/billing product — `loans`/`loan_plans`, `dps`/`dps_plans`,
+`fdr`/`fdr_plans`, `branches`/`branch_staff` and its guard, `other_banks`,
+`beneficiaries`, `airtime_operators`/`airtime_configs`. ZodiMed does not
+re-add a branch-scoped staff guard: its personas (Physician, Nurse, Front
+Desk, Billing/Coding Staff, Practice Administrator, Compliance Officer) all
+authenticate through the inherited `admin` guard, with per-location access
+governed by RBAC/policy scoping (§18) rather than a separate login guard —
+multi-location clinic groups model each location as a `locations` record
+under the multi-company/multi-branch scoping pattern in
+[localization-i18n.md](../../standards/localization-i18n.md#multi-company--multi-branch-data-scoping),
+not as a distinct auth boundary.
+
+ZodiMed inherits the base engine's admin settings/branding, payment
+gateways (for patient billing/copay collection), RBAC/auth, KYC (repurposed
+for patient identity verification where a clinic requires it), i18n, cron,
+extension toggles, and CMS/page builder as-is — see
+[base-codebase-strategy.md](../../architecture/base-codebase-strategy.md#inherited-as-is-the-admin-engine-every-product-keeps).
+On top of that inherited engine, ZodiMed builds its own domain modules
+(Patient Records, Scheduling, Clinical Documentation, E-Prescribing, Lab
+Integration, Billing & Claims, Patient Portal, Access Governance) per
+[`module-template.md`](../../templates/module-template.md).
+
+The one addition that goes beyond ordinary domain-module layering is a
+`PHIAccessContract` service, built on top of the inherited `Role`/
+`Permission` RBAC engine rather than replacing it: every PHI read is
+authorized twice — once by the standard RBAC permission check, once by a
+care-relationship/consent check the contract enforces at query time
+(care-team scoping, break-glass justification capture). This is the
+Policy-layer pattern described in
+[admin-template.md](../../templates/admin-template.md#roles--permissions-inherited-not-spatie):
+additional rules layered on the inherited RBAC engine, not a second,
+competing permission system.
+
+Each ZodiMed deployment belongs to exactly one clinic or clinic group,
+running on their own hosting with their own database, with zero runtime
+dependency on any other Zodize product or Zodize-operated service, per
+[single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md).
 
 ## 12. Technology
 
-Laravel + Vue per the shared stack
-([coding-standards-php-laravel.md](../../development/coding-standards-php-laravel.md),
-[coding-standards-vue.md](../../development/coding-standards-vue.md));
-PostgreSQL + Redis per
+Laravel 11 + PHP ^8.3 per the inherited base codebase
+([coding-standards-php-laravel.md](../../development/coding-standards-php-laravel.md)),
+with Blade/Vue for new module UI per
+[coding-standards-vue.md](../../development/coding-standards-vue.md);
+MySQL/MariaDB per the base codebase's inherited schema, matching
 [database-standards.md](../../development/database-standards.md), with
 field-level encryption for PHI columns per
 [data-protection-privacy.md](../../security/data-protection-privacy.md);
@@ -194,11 +225,18 @@ formats).
 
 ## 14. Core Data Model
 
-Full ER diagram queued (§ Roadmap). Core entities:
+Full ER diagram queued (§ Roadmap). Every entity below belongs to the one
+clinic or clinic group that owns this deployment — there is no `tenant_id`
+column anywhere in this schema, per
+[single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md).
+`location_id` (and `company_id` for a multi-entity clinic group) provide
+multi-location scoping within that one deployment, per
+[localization-i18n.md](../../standards/localization-i18n.md#multi-company--multi-branch-data-scoping).
+Core entities:
 
 | Entity | Key columns |
 |---|---|
-| `patients` | id, tenant_id, mrn, demographics (encrypted), primary_provider_id |
+| `patients` | id, mrn, demographics (encrypted), primary_provider_id |
 | `care_team_assignments` | id, patient_id, provider_id, role, relationship_start_at, relationship_end_at |
 | `appointments` | id, patient_id, provider_id, location_id, scheduled_at, status, appointment_type |
 | `encounters` | id, patient_id, provider_id, appointment_id, encounter_date, status (draft/signed/amended) |
@@ -271,13 +309,17 @@ notification-to-portal prompt, per §27.
 
 ## 18. Permissions & Roles
 
-Inherits ZodiCore's default system roles
-([rbac-permissions.md](../../security/rbac-permissions.md#default-system-roles))
-plus ZodiMed-specific roles: `Physician/Provider`, `Nurse/Clinical Staff`,
+Built on the inherited `Role`/`Permission` engine and `admin` guard per
+[admin-template.md](../../templates/admin-template.md#roles--permissions-inherited-not-spatie).
+ZodiMed's own roles: `Physician/Provider`, `Nurse/Clinical Staff`,
 `Front Desk`, `Billing/Coding Staff`, `Practice Administrator`,
 `Compliance Officer`, `Patient` (portal-only, scoped to own record). Key
-permissions: `charts.view` (always additionally gated by
-`PHIAccessContract` care-team check), `charts.break_glass`,
+permissions, registered into the inherited permission system per
+[permission-template.md](../../templates/permission-template.md):
+`charts.view` (always additionally gated by `PHIAccessContract` care-team
+check — the HIPAA-equivalent minimum-necessary-access rule from §27,
+implemented as an additional Policy-layer check on top of the inherited
+RBAC, not a separate permission system), `charts.break_glass`,
 `notes.sign`, `notes.amend`, `prescriptions.write`,
 `prescriptions.write_controlled` (requires elevated/step-up
 authentication), `claims.submit`, `claims.appeal`, `consents.manage`.
@@ -343,8 +385,7 @@ accounting-of-disclosures requirements.
   surfaced to Billing/Coding Staff as a suggestion requiring human
   confirmation, never auto-submitted.
 - Denial pattern analysis flagging claims likely to be denied before
-  submission, extending ZodiCore's anomaly-detection pattern
-  (§23 of [ZodiCore's SPEC.md](../ZodiCore/SPEC.md#23-ai-features)).
+  submission, built on ZodiMed's own claims and remittance history.
 
 ## 24. Automation, Scheduled Jobs, CLI Commands
 
@@ -385,10 +426,10 @@ applies. ZodiMed-specific requirements (HIPAA-equivalent):
   [data-protection-privacy.md](../../security/data-protection-privacy.md);
   PHI is never transmitted in notification bodies (§17).
 - **Business Associate Agreement posture**: ZodiMed's architecture and audit
-  trail are built to support a BAA-equivalent trust posture for tenants
-  operating under HIPAA or an equivalent regional health-privacy framework;
-  any third-party integration (§22) handling PHI must itself meet this
-  standard before activation.
+  trail are built to support a BAA-equivalent trust posture for the clinic
+  or clinic group operating under HIPAA or an equivalent regional
+  health-privacy framework; any third-party integration (§22) handling PHI
+  must itself meet this standard before activation.
 - **Accounting of disclosures**: the PHI access log (§14, §20) provides a
   complete, exportable accounting of who accessed a given patient's record
   and why, on request.
@@ -453,8 +494,12 @@ See [production-readiness-checklist.md](../../checklists/production-readiness-ch
 
 ## Roadmap (spec depth)
 
-This spec is Foundation-depth. Queued for Deep-depth expansion: full ER
-diagram and migration set (companion `DATA_MODEL.md`), full endpoint catalog
-(companion `API_REFERENCE.md`), full HL7/FHIR message mapping detail, and a
-complete quality/outcome measure report catalog beyond the summary list in
-§21.
+This spec is Foundation-depth. Its Architecture (§11), Core Data Model
+(§14), and Permissions & Roles (§18) sections were revised to the
+standalone, self-hosted, single-tenant model in
+[single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md);
+no product-domain content (vision, personas, journeys, clinical/billing
+workflows) changed. Queued for Deep-depth expansion: full ER diagram and
+migration set (companion `DATA_MODEL.md`), full endpoint catalog (companion
+`API_REFERENCE.md`), full HL7/FHIR message mapping detail, and a complete
+quality/outcome measure report catalog beyond the summary list in §21.

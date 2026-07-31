@@ -23,9 +23,10 @@ violation:
    diff coverage, not whole-repository coverage, so legacy modules don't
    block unrelated PRs).
 4. **Feature tests** — Laravel feature tests hitting real routes against an
-   in-memory/ephemeral test database, including the cross-tenant isolation
-   suite required by
-   [`../architecture/multi-tenancy.md`](../architecture/multi-tenancy.md#cross-tenant-data-leakage-prevention).
+   in-memory/ephemeral test database, including the non-negotiable test
+   cases (authorization denial, not-found, and — on a product with
+   multi-company/multi-branch scoping — cross-branch isolation) required by
+   [`../development/testing-standards.md`](../development/testing-standards.md#non-negotiable-test-cases).
 5. **Browser/E2E tests** — Playwright (or Cypress) tests covering the
    product's critical user journeys (login, core CRUD workflow, checkout/
    payment where applicable), run against a fully built frontend and a
@@ -81,49 +82,68 @@ one.
 
 ## Deployment strategy
 
-- Production deploys use a **rolling deployment** as the default: new
-  application nodes are brought up running the new release, health-checked
-  (see
-  [`monitoring-observability.md`](./monitoring-observability.md#health-check-endpoint-standard)),
-  and added to the load balancer while old nodes are drained and removed
-  one batch at a time — no full-fleet cutover in one step.
-- Financial-grade products MUST use **blue-green deployment** instead: the
-  new release is deployed to a fully separate, pre-warmed environment,
-  validated with automated smoke tests against it, and traffic is cut over
-  at the load balancer only after validation passes — giving an instant
-  full rollback path (repoint the load balancer back to blue) rather than a
-  gradual rolling rollback.
-- Database migrations MUST be backward-compatible with the previous release
-  for the duration of a rolling/blue-green window (additive changes first,
-  destructive changes — column drops, renames — in a subsequent release
-  after the old code path is fully retired). This "expand and contract"
-  pattern is mandatory for any product with more than one running
-  application version during deploy.
+Zodize does not operate production infrastructure for any product — every
+buyer runs their own shared/VPS hosting and applies each release themselves
+(see
+[`../architecture/overview.md`](../architecture/overview.md#deployment-topology-per-product-per-buyer)
+and
+[`single-tenant-deployment-model.md`](../architecture/single-tenant-deployment-model.md#licensing-and-update-model)).
+What this pipeline's "Deploy" stage produces and promotes is:
+
+- **Zodize's own internal staging/demo environment** — a single running
+  instance per product, used for QA and for the always-live Demo Standard
+  ([`../../README.md`](../../README.md)). This environment uses a **rolling
+  restart** (new code deployed, health-checked per
+  [`monitoring-observability.md`](./monitoring-observability.md#health-check-endpoint-standard),
+  then traffic resumed) — there is no customer traffic to protect here, so a
+  full-fleet restart is acceptable.
+- **The versioned, downloadable release artifact** the buyer applies to
+  their own single hosting instance, per
+  [`versioning-releases.md`](../development/versioning-releases.md). Zodize
+  never deploys this artifact on the buyer's behalf.
+- Database migrations MUST be safe for a buyer to run directly against their
+  own single production database with minimal downtime: additive changes
+  first, destructive changes — column drops, renames — in a subsequent
+  release only after the old code path is fully retired. This "expand and
+  contract" pattern matters more here than in a rolling-fleet deploy,
+  because a self-hosted buyer applying an update has no second node to mask
+  an incompatible in-between state during the update window.
 
 ## Rollback requirement
 
-- Every deploy pipeline MUST support a one-command rollback to the
-  immediately prior release artifact, without requiring a new build.
-- Rollback MUST be exercised (not just theoretically available) at least
-  once per quarter as part of the restore-testing discipline referenced in
+- Zodize's internal staging/demo pipeline MUST support a one-command
+  rollback to the immediately prior release artifact, without requiring a
+  new build. Rollback MUST be exercised (not just theoretically available)
+  at least once per quarter as part of the restore-testing discipline
+  referenced in
   [`../security/backup-disaster-recovery.md`](../security/backup-disaster-recovery.md#restore-testing-cadence),
   so the team has verified, current muscle memory for it.
-- A deploy that trips an automated alert threshold (error rate spike,
-  latency regression) within 15 minutes of going live MUST trigger an
-  automatic rollback for financial-grade products, and a paged on-call
-  decision for all other products, per
+- A deploy to Zodize's internal staging/demo environment that trips an
+  automated alert threshold (error rate spike, latency regression) within
+  15 minutes of going live MUST trigger an automatic rollback for
+  financial-grade products, and a paged on-call decision for all other
+  products, per
   [`monitoring-observability.md`](./monitoring-observability.md#alerting-thresholds-and-on-call-escalation).
+- Every product release MUST ship a documented rollback procedure the buyer
+  can follow without developer assistance on their own hosting: reinstall
+  the prior release's codebase archive and, if a migration ran, restore the
+  pre-migration database backup per
+  [`../security/backup-disaster-recovery.md`](../security/backup-disaster-recovery.md).
 
 ## Feature flag gating for risky deploys
 
 - Any change that is behaviorally risky (new payment flow, new
   authentication path, a rewrite of a high-traffic module) MUST ship behind
-  a feature flag defaulted off in production, enabled first for an internal
-  Zodize test tenant, then a small percentage rollout, then general
-  availability — never a direct 100% cutover for risky changes.
-- Feature flags are managed centrally through ZodiCore's flag service
-  (tenant-scoped and percentage-rollout-capable) so a flag can be disabled
-  instantly without a redeploy if an issue surfaces.
+  a feature flag defaulted off, validated first in Zodize's internal
+  staging/demo environment, then included in the next release as an
+  opt-in (admin-toggleable) capability before it defaults on in a
+  subsequent release — never a direct default-on cutover for risky changes.
+- Feature flags are implemented within each product's own codebase per
+  [`../development/feature-flags.md`](../development/feature-flags.md) —
+  global to the deployment, or scoped per company/branch on a product with
+  multi-company/multi-branch operation — so a flag can be disabled from the
+  admin panel or a config toggle without a new code release if an issue
+  surfaces after a buyer applies an update.
 - A flag guarding a launched, stable feature MUST be removed within one
   release cycle of reaching 100% rollout, per the flag hygiene rule in
   [`definition-of-done.md`](./definition-of-done.md#feature-flags).

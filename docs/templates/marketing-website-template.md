@@ -119,11 +119,14 @@ decision. Each markdown file MUST carry frontmatter with, at minimum:
 - The consent banner MUST offer a functional "reject non-essential" path that
   is as easy to select as "accept" — no dark patterns.
 
-## What ZodiCore provides vs. what a product customizes
+## What the shared component library provides vs. what a product customizes
 
-ZodiCore provides: the `ConsentBanner.vue` component, the sitemap generator
-build step, the shared `Nav.vue`/`Footer.vue` shell components, and the OG
-image generation pipeline.
+The Zodize design-system frontend shell every product clones (see
+[`../architecture/base-codebase-strategy.md`](../architecture/base-codebase-strategy.md#one-base-codebase-twenty-independent-products))
+provides: the `ConsentBanner.vue` component, the sitemap generator build
+step, the shared `Nav.vue`/`Footer.vue` shell components, and the OG image
+generation pipeline. These ship inside the product's own codebase, not as a
+call to another Zodize product at runtime.
 
 A product customizes: all content under `marketing/content/`, the pricing
 tiers and their feature-comparison matrix, hero imagery, and any

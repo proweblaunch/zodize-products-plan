@@ -98,14 +98,24 @@ the error or loading state is not production-ready per
   [`../security/authentication-authorization.md`](../security/authentication-authorization.md);
   this template only owns the page states, not the authorization rule.
 
-### 7. SSO entry point (`/login/sso`, `/auth/sso/callback`)
+### 7. Social login entry point (`/login/redirect/{provider}`, `/login/callback/{provider}`)
 
-- `/login/sso`: tenant/domain input → `resolving` (loading) → redirect to
-  the identity provider, or `error` (no SSO configured for that domain, with
-  a fallback link to standard login).
-- `/auth/sso/callback`: `processing` (loading) → `success` (redirect to
-  dashboard) or `error` (IdP rejected, account not provisioned — MUST show
-  actionable next steps, not a raw provider error).
+Every product inherits the base codebase's existing social login
+integration (Google/Facebook/LinkedIn via `laravel/socialite`, configured
+per
+[`../standards/admin-configuration-baseline.md`](../standards/admin-configuration-baseline.md#general-settings--branding))
+rather than implementing enterprise SSO/SAML from scratch — there is no
+multi-tenant identity provider to resolve against, since each deployment
+belongs to exactly one business (see
+[`../architecture/single-tenant-deployment-model.md`](../architecture/single-tenant-deployment-model.md)).
+
+- `/login/redirect/{provider}`: `resolving` (loading) → redirect to the
+  configured OAuth provider, or `error` (that provider is not enabled by
+  the buyer's admin, with a fallback link to standard login).
+- `/login/callback/{provider}`: `processing` (loading) → `success` (redirect
+  to dashboard) or `error` (provider rejected the login, or the account is
+  not provisioned — MUST show actionable next steps, not a raw provider
+  error).
 
 ### 8. Session and device management (`/settings/security/sessions`)
 
@@ -117,14 +127,20 @@ the error or loading state is not production-ready per
   `revoked` (row removed with confirmation toast).
 - MUST include a "revoke all other sessions" bulk action.
 
-## What ZodiCore provides vs. what a product customizes
+## What the inherited base codebase provides vs. what a product customizes
 
-ZodiCore provides: every controller listed above, the MFA TOTP/recovery-code
-implementation, the SSO protocol handlers (SAML/OIDC), rate limiting, and
-the session store.
+The base codebase (see
+[`../architecture/base-codebase-strategy.md`](../architecture/base-codebase-strategy.md))
+provides: every controller listed above, the MFA TOTP/recovery-code
+implementation, the social login OAuth handlers (Google/Facebook/LinkedIn
+via `laravel/socialite`), rate limiting, and the session store, all running
+within the product's own three auth guards (`web`, `admin`, `branch_staff`)
+per [`admin-template.md#auth-guards`](./admin-template.md#auth-guards).
 
-A product customizes: page copy, logo/branding on the auth layout, and which
-SSO providers are enabled for its tenants. A product MUST NOT implement its
-own registration/login controller — new products register with ZodiCore's
-identity service per
-[`../architecture/multi-tenancy.md`](../architecture/multi-tenancy.md).
+A product customizes: page copy, logo/branding on the auth layout, and
+which social login providers are enabled and configured by the buyer from
+the admin panel. A product MUST NOT implement its own registration/login
+controller from scratch, and MUST NOT call out to another Zodize product or
+any Zodize-operated identity service — each product's authentication is
+fully self-contained within its own codebase per
+[`../architecture/single-tenant-deployment-model.md`](../architecture/single-tenant-deployment-model.md#no-shared-platform-service).

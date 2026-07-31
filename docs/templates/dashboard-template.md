@@ -6,7 +6,7 @@ product. The interaction and layout rules it implements are defined in
 this document is the concrete scaffold. A product customizes its default
 widget set beyond the mandatory minimum and its personalization options; it
 does not customize the layout regions or remove the getting-started widget
-for new tenants.
+for a new deployment.
 
 ## Directory structure
 
@@ -52,21 +52,22 @@ four; a region MAY render empty (e.g. no summary tiles configured) but MUST
 still reserve its layout slot so that adding content later is not a layout
 change.
 
-## Default widget set for a new tenant
+## Default widget set for a new deployment
 
-A brand-new tenant's dashboard MUST NOT render empty. On tenant creation,
-`WidgetLayoutService` MUST seed the widget grid with:
+A brand-new deployment's dashboard MUST NOT render empty. As part of the
+buyer's initial setup (first admin login after install), `WidgetLayoutService`
+MUST seed the widget grid with:
 
 1. **Getting Started checklist widget** (`GettingStartedChecklist.vue`) —
-   MANDATORY, always the first widget for any tenant that has not completed
-   onboarding. It MUST show a product-specific checklist (minimum 4 items,
-   e.g. "Invite your team", "Connect your first integration", "Complete your
-   profile", "Explore the {core feature}") with a visible progress indicator.
-   It MUST auto-dismiss (moving to a collapsed "onboarding complete" state,
-   not deletion) once every item is checked, and MUST remain manually
-   re-openable from the footer/utility region afterward.
+   MANDATORY, always the first widget for any deployment that has not
+   completed onboarding. It MUST show a product-specific checklist (minimum 4
+   items, e.g. "Configure your first payment gateway", "Add your team",
+   "Complete your business profile", "Explore the {core feature}") with a
+   visible progress indicator. It MUST auto-dismiss (moving to a collapsed
+   "onboarding complete" state, not deletion) once every item is checked, and
+   MUST remain manually re-openable from the footer/utility region afterward.
 2. **Recent Activity widget** (`RecentActivity.vue`) — a feed of the
-   tenant's own recent actions, sourced from the audit log per
+   business's own recent actions, sourced from the audit log per
    [`../security/audit-logging.md`](../security/audit-logging.md), filtered
    to activity-relevant (not security-relevant) entries.
 3. **Quick Actions widget** (`QuickActions.vue`) — up to 6 shortcuts into
@@ -79,8 +80,8 @@ visually empty below the header region.
 ## Personalization requirements
 
 - Widgets MUST be reorderable via drag-and-drop and resizable in at least
-  two size classes (compact, expanded), persisted per-user (not per-tenant)
-  in `dashboard_layouts`.
+  two size classes (compact, expanded), persisted per-user in
+  `dashboard_layouts`.
 - A user MUST be able to hide any non-mandatory widget and restore it later
   via `WidgetSettingsPanel.vue`'s "Add widget" gallery — hiding MUST NOT
   delete the widget's underlying data.
@@ -91,12 +92,15 @@ visually empty below the header region.
   data (e.g. a deleted integration) MUST render its own empty/error state,
   never break the surrounding grid.
 
-## What ZodiCore provides vs. what a product customizes
+## Reusable scaffold vs. what a product customizes
 
-ZodiCore provides: `Layout.vue`, `WidgetGrid.vue`, `WidgetRegistry.php`
-(the extension point new widgets register against),
-`WidgetLayoutService.php`, the `dashboard_layouts` table, and the
-`GettingStartedChecklist.vue` and `RecentActivity.vue` widgets.
+This dashboard scaffold ships inside every product's own codebase — it is
+not fetched from another Zodize product at runtime, per
+[`../architecture/single-tenant-deployment-model.md`](../architecture/single-tenant-deployment-model.md#no-shared-platform-service).
+It provides: `Layout.vue`, `WidgetGrid.vue`, `WidgetRegistry.php` (the
+extension point new widgets register against), `WidgetLayoutService.php`,
+the `dashboard_layouts` table, and the `GettingStartedChecklist.vue` and
+`RecentActivity.vue` widgets.
 
 A product customizes: the getting-started checklist item list (via
 `WidgetRegistry` configuration, not by forking the component), its

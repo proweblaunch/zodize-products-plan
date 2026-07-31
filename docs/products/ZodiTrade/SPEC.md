@@ -8,9 +8,17 @@
 > this document. See [PRODUCT_CATALOG.md](../../../PRODUCT_CATALOG.md) for
 > spec status definitions.
 
-Built on [ZodiCore](../ZodiCore/SPEC.md) — ZodiTrade does not reimplement
-identity, tenancy, billing, notifications, RBAC, plugins, or audit logging;
-it consumes those services and adds brokerage-domain modules on top.
+ZodiTrade is a standalone, self-hosted Laravel application built by cloning
+the sanitized [base codebase](../../architecture/base-codebase-strategy.md),
+running the
+[genericization checklist](../../architecture/product-genericization-checklist.md)
+to strip the base engine's banking-specific loan/DPS/FDR/branch tables, and
+layering brokerage-domain modules on top. It does not depend on any other
+Zodize product or on a central "ZodiCore" platform for identity, billing,
+notifications, or tenancy — see
+[single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md).
+`ZodiCore` is itself just another standalone product in the catalog (a
+general-purpose back-office/ERP starter), not a platform ZodiTrade runs on.
 
 ## 1. Vision
 
@@ -26,9 +34,10 @@ settlement infrastructure to run a compliant trading product from day one.
 Launching a brokerage today means integrating an order management system, a
 clearing/settlement relationship, a market data feed, and tax lot
 accounting separately, then bolting compliance and audit on top. ZodiTrade
-exists to give that integration surface as one coherent platform built on
-ZodiCore's identity and audit backbone, so a broker-dealer's engineering
-team builds the product experience, not the plumbing.
+exists to give that integration surface as one coherent, self-hosted
+platform built on a base codebase whose RBAC, KYC, and audit engine already
+work, so a broker-dealer's engineering team builds the product experience,
+not the plumbing.
 
 ## 3. Target Market
 
@@ -47,10 +56,10 @@ Capital markets, wealth management, retail and institutional brokerage.
 
 | Capability | Comparable to | Zodize differentiation |
 |---|---|---|
-| Order management system | Charles River IMS, FlexTrade, Bloomberg EMSX | Ships with tenant/RBAC/audit already built via ZodiCore, faster to stand up a compliant OMS |
-| Retail brokerage platform | Interactive Brokers' platform, Robinhood's internal stack, Alpaca | Multi-tenant from the ground up, so a single deployment serves multiple brokerage brands/programs |
+| Order management system | Charles River IMS, FlexTrade, Bloomberg EMSX | Ships with RBAC/audit already built into the inherited base codebase, faster to stand up a compliant OMS |
+| Retail brokerage platform | Interactive Brokers' platform, Robinhood's internal stack, Alpaca | Standalone, self-hosted per brokerage brand/program — each buyer runs their own independent deployment with no shared infrastructure or cross-brand data exposure |
 | Portfolio/positions tooling | Addepar, Black Diamond | Positions and tax lots share one audit trail with orders and settlement, not a reconciled downstream copy |
-| Market data distribution | Refinitiv Eikon feeds, Polygon.io, IEX Cloud | Feed-agnostic ingestion contract so a tenant can swap vendors without touching the OMS |
+| Market data distribution | Refinitiv Eikon feeds, Polygon.io, IEX Cloud | Feed-agnostic ingestion contract so a buyer can swap vendors without touching the OMS |
 | Trade confirmation/compliance | Broadridge, SS&C Advent | Confirmations and audit trail generated directly from the settlement ledger of record |
 
 ## 6. Personas
@@ -65,7 +74,10 @@ Capital markets, wealth management, retail and institutional brokerage.
   and concentration risk.
 - **Back-Office/Settlement Analyst** — reconciles trades to settlement and
   produces trade confirmations.
-- **Zodize Support/Ops** — as defined in [ZodiCore §6](../ZodiCore/SPEC.md#6-personas).
+- **Buyer's own IT/support staff** — the only support layer this deployment
+  has; there is no Zodize-operated support console, since each deployment is
+  the buyer's own standalone codebase (see
+  [admin-template.md](../../templates/admin-template.md)).
 
 ## 7. User Journeys
 
@@ -125,7 +137,8 @@ Capital markets, wealth management, retail and institutional brokerage.
 - Tax lot accounting: FIFO, LIFO, and specific-lot identification methods,
   configurable per account, with realized/unrealized gain-loss reporting.
 - Trade confirmations: generated per filled/settled trade, delivered per
-  tenant notification preferences, and archived per retention policy.
+  account holder notification preferences, and archived per retention
+  policy.
 - Full second-layer baseline per
   [product-philosophy.md](../../development/product-philosophy.md#second-layer-feature-catalog):
   approval chains (margin liquidation override, large-order review),
@@ -151,18 +164,38 @@ inherited baseline. ZodiTrade-specific additions:
 
 ## 11. Architecture
 
-ZodiTrade is a Laravel application consuming ZodiCore's identity, tenancy,
-billing, notification, RBAC, plugin, and audit packages exactly as
-described in [ZodiCore §11](../ZodiCore/SPEC.md#11-architecture). It adds a
-`zodize/trading-oms` domain package providing the order lifecycle state
-machine and a `zodize/trading-ledger` package providing position/tax-lot
-accounting, both registering into ZodiCore's audit log and RBAC policy
-registry. Market data ingestion and order routing run as dedicated queued/
-streaming workers (per
+ZodiTrade is built by cloning the sanitized
+[base codebase](../../architecture/base-codebase-strategy.md) — a single,
+independent Laravel application the buyer deploys entirely on their own
+shared/VPS hosting, per
+[single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md).
+Building ZodiTrade means running the full
+[genericization checklist](../../architecture/product-genericization-checklist.md):
+the inherited `loans`/`dps`/`fdr`/`branches`/`other_banks` tables and
+controllers are stripped (they do not apply to a brokerage), and ZodiTrade
+keeps and builds on top of the base engine's wallet/ledger, payment
+gateways, RBAC/auth (`Role`/`Permission` models), KYC, i18n, and admin
+configuration surface (see
+[base-codebase-strategy.md](../../architecture/base-codebase-strategy.md#inherited-as-is-the-admin-engine-every-product-keeps)).
+
+On that foundation, ZodiTrade adds its own domain modules — Order
+Management, Routing, Portfolio, Margin, Settlement, Market Data, Tax Lot
+Accounting, and Compliance — as new, clearly bounded modules per
+[module-template.md](../../templates/module-template.md), registering into
+the inherited audit log and RBAC policy registry rather than building
+parallel systems. Because ZodiTrade needs brokerage cash balances in
+multiple currencies simultaneously per account, it extends the inherited
+wallet engine per §14 rather than using `User.balance` directly for
+account cash. Market data ingestion and order routing run as dedicated
+queued/streaming workers (per
 [caching-queues-events.md](../../architecture/caching-queues-events.md))
 isolated from the request path, with a `MarketDataFeedContract` and
 `BrokerRoutingContract` abstraction so venue/vendor integrations are
-swappable without touching OMS core logic.
+swappable without touching OMS core logic. ZodiTrade has no runtime
+dependency on any other Zodize product or on a Zodize-operated central
+service; the only external dependencies are the third-party clearing
+broker, market data, and KYC integrations the buyer's own brokerage
+configures (§22).
 
 ## 12. Technology
 
@@ -191,11 +224,14 @@ and market data to the client.
 ## 14. Core Data Model
 
 The 12 entities below are the load-bearing core; full ER diagram is queued
-(see [Roadmap (spec depth)](#roadmap-spec-depth)).
+(see [Roadmap (spec depth)](#roadmap-spec-depth)). There is no `tenant_id`
+column anywhere in this model — each deployed instance belongs to exactly
+one broker-dealer/RIA/fintech, per
+[single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md#what-single-tenant-changes-in-the-data-model).
 
 | Entity | Key columns |
 |---|---|
-| `brokerage_accounts` | id, tenant_id, customer_id, account_type (cash/margin), status, opened_at |
+| `brokerage_accounts` | id, customer_id, account_type (cash/margin), status, opened_at |
 | `orders` | id, account_id, instrument_id, side, order_type, quantity, limit_price, stop_price, time_in_force, status |
 | `executions` | id, order_id, fill_quantity, fill_price, venue, executed_at |
 | `positions` | id, account_id, instrument_id, quantity, average_cost, updated_at |
@@ -207,6 +243,28 @@ The 12 entities below are the load-bearing core; full ER diagram is queued
 | `margin_calls` | id, margin_account_id, amount_due, issued_at, cure_deadline, resolved_at |
 | `watchlists` | id, user_id, name, is_shared |
 | `watchlist_items` | id, watchlist_id, instrument_id, sort_order |
+
+**Multi-currency brokerage cash balances**: ZodiTrade genuinely needs a
+brokerage account to hold cash in more than one currency simultaneously
+(e.g. a USD settlement balance and a EUR settlement balance on the same
+account, for a multi-market brokerage). Per
+[ADR-0002](../../decisions/0002-single-currency-wallet-by-default.md), the
+inherited single-currency `User.balance`/`Transaction` engine is not
+extended globally; ZodiTrade instead extends the pattern in its own domain
+module following
+[wallet-system.md's Multi-currency gap](../../standards/wallet-system.md#multi-currency-gap):
+
+| Entity | Key columns |
+|---|---|
+| `brokerage_account_balances` | id, brokerage_account_id, currency, cash_balance, updated_at |
+| `brokerage_cash_transactions` | id, brokerage_account_balance_id, amount (signed), currency, trigger (deposit/withdrawal/trade_settlement/fee/dividend), post_balance_snapshot, reference_id, created_at |
+
+`brokerage_account_balances` is scoped per `brokerage_account_id`, not per
+user, so a single trader with multiple brokerage accounts (e.g. an
+individual and a joint account) holds independent currency balances per
+account. `brokerage_cash_transactions` follows the same append-only,
+post-balance-snapshot invariant as the inherited `Transaction` model — a
+correction is a new offsetting row, never an edit to a past one.
 
 ## 15. Key API Endpoints
 
@@ -240,7 +298,7 @@ conform to [api-standards.md](../../development/api-standards.md) and
 
 ## 16. Events
 
-Domain events registered on ZodiCore's event bus (see
+Domain events registered on the inherited event bus (see
 [caching-queues-events.md](../../architecture/caching-queues-events.md)):
 `order.submitted`, `order.accepted`, `order.rejected`, `order.filled`,
 `order.partially_filled`, `order.canceled`, `position.updated`,
@@ -266,8 +324,11 @@ All channels follow
 
 ## 18. Permissions & Roles
 
-Extends [ZodiCore's default roles](../../security/rbac-permissions.md#default-system-roles)
-with brokerage-specific roles: `Trading Operations Manager`,
+Built on the inherited `Role`/`Permission` engine per
+[admin-template.md](../../templates/admin-template.md), with
+brokerage-specific roles registered on top of the
+[default system roles](../../security/rbac-permissions.md#default-system-roles):
+`Trading Operations Manager`,
 `Compliance Officer`, `Margin/Risk Analyst`, `Settlement Analyst`, `Trader`.
 Key permissions: `orders.place`, `orders.cancel`, `orders.cancel_any`
 (ops-only override), `margin.issue_call`, `margin.override_liquidation`,
@@ -277,14 +338,14 @@ Key permissions: `orders.place`, `orders.cancel`, `orders.cancel_any`
 
 ## 19. Workflows & Approval Chains
 
-- **Large-order review**: orders above a tenant-configured notional
+- **Large-order review**: orders above an admin-configured notional
   threshold route to a Trading Operations Manager for pre-trade approval
   before routing to the venue.
 - **Margin call cure/liquidation**: a margin call enters a cure window;
   if uncured, forced liquidation requires the risk engine's automated
   decision to be logged and is subject to a configurable manual-override
-  approval by a Margin/Risk Analyst before execution, unless the tenant has
-  opted into fully automated liquidation.
+  approval by a Margin/Risk Analyst before execution, unless the deployment
+  has opted into fully automated liquidation.
 - **Restricted list changes**: adding/removing an instrument from a
   restricted list requires Compliance Officer approval and is
   audit-logged with an effective-date.
@@ -296,7 +357,7 @@ Key permissions: `orders.place`, `orders.cancel`, `orders.cancel_any`
 
 Every order state transition, fill, margin call, liquidation decision,
 settlement status change, restricted-list change, and tax lot disposal
-writes an immutable audit entry via ZodiCore's audit log
+writes an immutable audit entry via the inherited audit log
 ([audit-logging.md](../../security/audit-logging.md)), capturing actor
 (including "system" for automated liquidation), timestamp, and before/after
 state. Order and execution records are never edited in place — corrections
@@ -322,10 +383,11 @@ occur via a new offsetting record referencing the original.
 - **Market data vendors**: real-time quote feeds (e.g. Polygon.io, IEX
   Cloud, Refinitiv-class vendors) behind a `MarketDataFeedContract`,
   normalized to one internal quote schema.
-- **KYC/AML and suitability verification**: account opening reuses the
-  same identity-verification integration category as
-  [ZodiBank §22](../ZodiBank/SPEC.md#22-integrations), plus
-  investor-suitability questionnaires for margin/options approval tiers.
+- **KYC/AML and suitability verification**: account opening uses the
+  inherited base engine's KYC form-builder and review flow (see
+  [admin-configuration-baseline.md](../../standards/admin-configuration-baseline.md#kyc)),
+  plus investor-suitability questionnaires for margin/options approval
+  tiers.
 - **Tax reporting**: year-end 1099-B-style export integration for realized
   gain/loss reporting.
 - **Corporate actions data**: dividend, split, and symbol-change feeds that
@@ -333,10 +395,10 @@ occur via a new offsetting record referencing the original.
 
 ## 23. AI Features
 
-- Trade surveillance assistant: pattern detection layered on top of
-  ZodiCore's audit-log anomaly detection ([ZodiCore §23](../ZodiCore/SPEC.md#23-ai-features)),
-  tuned for wash-trading-like and layering-like order sequences, routed to
-  the Compliance queue for human review.
+- Trade surveillance assistant: pattern detection layered on top of the
+  inherited audit log's anomaly detection, tuned for wash-trading-like and
+  layering-like order sequences, routed to the Compliance queue for human
+  review.
 - Portfolio insight summaries: plain-language summary of a client's
   portfolio concentration, unrealized gain/loss position, and margin
   utilization, generated on demand for the trader/advisor persona.
@@ -352,12 +414,11 @@ occur via a new offsetting record referencing the original.
 - CLI commands (Artisan): `trade:recalculate-margin`,
   `trade:poll-settlements`, `trade:generate-confirmations`,
   `trade:sync-restricted-list` — each requires the same authorization
-  context as its API equivalent, per
-  [ZodiCore §24](../ZodiCore/SPEC.md#24-automation-scheduled-jobs-cron-jobs-cli-commands).
+  context as its API equivalent.
 
 ## 25. Seed/Demo Data
 
-`TradeDemoSeeder` provisions a demo tenant with a realistic instrument
+`TradeDemoSeeder` provisions the demo deployment with a realistic instrument
 universe across equities/ETFs/options, 100+ synthetic accounts with varied
 cash/margin status, 12 months of order and execution history, a populated
 tax lot ledger spanning multiple lot methods, and open/resolved margin call
@@ -370,7 +431,7 @@ and the Demo Standard in [README.md](../../../README.md).
 See §10; additionally: portfolio and position reads reflect the latest
 settled and unsettled activity within 1 second of an execution event, and
 the order blotter supports real-time updates for at least 5,000 concurrent
-open orders per tenant without polling.
+open orders per deployment without polling.
 
 ## 27. Security Requirements
 
@@ -383,19 +444,19 @@ applies, plus:
   never logged in plaintext.
 - **SOC2-equivalent controls**: change management and access review apply
   to order-routing and settlement modules with the same rigor as the
-  ZodiCore platform baseline.
+  inherited base engine.
 - **KYC/AML and suitability verification** required before an account can
   place its first order, including enhanced due diligence for margin and
   options trading tiers.
 - **Immutable audit trails**: order, execution, and settlement audit
   entries are append-only, matching §20.
 - **MFA is mandatory, not optional**, for every human user role placing
-  orders or approving margin/compliance actions, enforced at the tenant
-  policy level per
+  orders or approving margin/compliance actions, enforced at the
+  deployment's security policy level per
   [authentication-authorization.md](../../security/authentication-authorization.md).
 - Large-order review and margin-liquidation override (§19) are security/
-  risk controls, not workflow conveniences, and cannot be disabled by a
-  tenant admin.
+  risk controls, not workflow conveniences, and cannot be disabled by an
+  admin of the deployment.
 
 ## 28. Testing Requirements
 
@@ -407,9 +468,11 @@ specific-lot gain-loss calculations against known reference cases.
 
 ## 29. Deployment Requirements
 
-Per [deployment-template.md](../../templates/deployment-template.md). Order
-entry and market data streaming services deploy with a zero-downtime
-requirement during each tenant's configured market hours, with deploys
+Per [deployment-template.md](../../templates/deployment-template.md), onto
+the buyer's own shared/VPS hosting per
+[single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md).
+Order entry and market data streaming services deploy with a zero-downtime
+requirement during the deployment's configured market hours, with deploys
 scheduled outside trading hours where feasible.
 
 ## 30. Acceptance Criteria
@@ -430,7 +493,7 @@ See [production-readiness-checklist.md](../../checklists/production-readiness-ch
 and [security-checklist.md](../../checklists/security-checklist.md).
 ZodiTrade additionally requires sign-off from a compliance stakeholder that
 pre-trade checks, restricted-list enforcement, and best-execution reporting
-have been validated against the tenant's actual broker-dealer/RIA
+have been validated against the buyer's actual broker-dealer/RIA
 obligations before go-live.
 
 ## 32. Future Roadmap
@@ -455,10 +518,14 @@ obligations before go-live.
 
 ## Roadmap (spec depth)
 
+This spec's Architecture and Core Data Model sections were revised to
+reflect the corrected standalone, self-hosted, single-tenant deployment
+model — see
+[single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md)
+and [base-codebase-strategy.md](../../architecture/base-codebase-strategy.md).
 This spec is Foundation-depth. Queued for Deep-depth expansion: a full ER
 diagram and migration set for the order/position/settlement schema
 (companion `DATA_MODEL.md`), a complete endpoint catalog (companion
-`API_REFERENCE.md`) matching [ZodiCore's structure](../ZodiCore/SPEC.md),
-and a full report catalog covering additional asset-class-specific
-compliance reports. Changes follow
+`API_REFERENCE.md`), and a full report catalog covering additional
+asset-class-specific compliance reports. Changes follow
 [CONTRIBUTING.md](../../../CONTRIBUTING.md).

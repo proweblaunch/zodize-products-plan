@@ -15,8 +15,7 @@ brand character.
 - New users see dark theme on first login with no theme selection prompt.
 - A theme toggle MUST be available in account/workspace settings (never
   buried more than one navigation level deep), switching immediately without
-  a page reload, and persisting per-user (not per-tenant) via a stored
-  preference.
+  a page reload, and persisting per-user via a stored preference.
 - The toggle sets `data-theme="dark"` or `data-theme="light"` on the root
   `<html>` element; the token blocks defined in
   [Color System](./color-system.md) key off this attribute, per the
@@ -69,7 +68,7 @@ must be present even where a shadow is also used.
   image cannot be avoided (e.g. a partner logo in a directory), it is
   placed on an explicit `--color-surface-1` or white "logo well" card
   rather than directly on the dark canvas, to guarantee legibility.
-- Uploaded user/tenant content (e.g. a customer's own logo in ZodiCommerce
+- Uploaded user-supplied content (e.g. a business's own logo in ZodiCommerce
   storefront branding) is exempt from the token system by nature, but the
   UI chrome around it MUST still provide adequate surrounding contrast per
   [Accessibility](./accessibility.md).

@@ -10,8 +10,8 @@ Use a Repository class when a model has **any** of:
 - Multiple possible data sources or a plausible future one (e.g. a resource
   that may be read from a search index for listing but Eloquent for
   mutation).
-- Complex tenant/permission-scoped visibility rules that must be applied
-  consistently everywhere the model is queried.
+- Complex permission-scoped or company/branch-scoped visibility rules that
+  must be applied consistently everywhere the model is queried.
 
 ## When direct Eloquent is acceptable
 
@@ -27,18 +27,22 @@ avoiding premature abstraction.
   and bound to a concrete Eloquent implementation in a service provider —
   Services depend on the interface, never the concrete class, so tests can
   substitute an in-memory fake.
-- Method names describe intent, not SQL: `findOverdueInvoicesForTenant()`,
+- Method names describe intent, not SQL: `findOverdueInvoicesForBranch()`,
   not `queryInvoicesWhereStatusAndDueDate()`.
 - Repositories return domain models or typed DTOs/Collections — never raw
   query builder instances or arrays — so callers are insulated from the
   underlying query mechanism.
 
-## Tenant scoping responsibility
+## Company/branch scoping responsibility
 
-A repository method never accepts an implicit "current tenant" from global
-state silently — tenant scoping is applied via the model's global scope (see
-[database-standards.md](./database-standards.md#multi-tenancy-at-the-schema-level)),
-and repository tests explicitly assert cross-tenant isolation.
+On a product with multi-company/multi-branch scoping, a repository method
+never accepts an implicit "current company/branch" from global state
+silently — that scoping is applied via the model's global scope (see
+[database-standards.md](./database-standards.md#single-tenant-at-the-schema-level)
+and
+[localization-i18n.md](../standards/localization-i18n.md#multi-company--multi-branch-data-scoping)),
+and repository tests explicitly assert that a user without access to a given
+branch cannot read its records through the repository.
 
 ## What repositories do not do
 

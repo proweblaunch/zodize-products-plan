@@ -86,26 +86,36 @@ case a short notes entry is required regardless of version tier.
 
 ## Feature flag rollout stages
 
+Because each deployment is an independent, buyer-owned instance with its own
+single `feature_flags` row per flag (see
+[database-template.md](./database-template.md)), a rollout stage is not a
+runtime toggle that varies across many live customers of one running
+instance — it governs which **release channel** a feature ships in, using
+the flag's local `is_enabled` value inside a given release plus
+[admin-template.md](./admin-template.md)'s feature flag management UI for a
+buyer who wants to switch it off locally after installing that release.
 Every customer-facing feature of non-trivial risk (anything touching
-billing, data migration, or a core workflow) MUST roll out through the
-following stages, using the feature flag system from
-[database-template.md](./database-template.md) and operated via
-[admin-template.md](./admin-template.md)'s feature flag management UI:
+wallet/ledger behavior, a data migration, or a core workflow) MUST progress
+through the following stages before it ships in the default release
+channel:
 
-1. **Internal** — enabled only for Zodize-staff tenants/accounts. Used to
-   validate the feature against real usage patterns before any customer
-   exposure.
-2. **Beta tenants** — enabled for an explicit, opted-in list of beta tenants
-   who have agreed to early access and a feedback channel. Minimum soak
-   time before promotion is defined per-product in
+1. **Internal** — the flag ships `is_enabled` false by default, exercised
+   only in Zodize's own `staging` environment (see
+   [deployment-template.md](./deployment-template.md#zodizes-own-environment-tiers-pre-release-only))
+   against demo data. Used to validate the feature before any buyer sees it.
+2. **Beta** — shipped in an explicit, clearly labeled beta release channel
+   that an opted-in list of beta buyers download and install themselves,
+   having agreed to early access and a feedback channel. Minimum soak time
+   before promotion is defined per-product in
    `docs/products/<product>/SPEC.md`; there is no fixed handbook-wide
    minimum because risk varies by feature.
-3. **General availability (GA)** — enabled by default for all tenants,
-   flag's `is_globally_enabled` set true, with per-tenant override capability
-   retained for support-driven exceptions (e.g. a tenant who needs to stay
-   on old behavior temporarily).
+3. **General availability (GA)** — the flag ships `is_enabled` true by
+   default in the standard release channel every buyer downloads/updates
+   into, with the buyer's own admin panel retaining the ability to switch it
+   off locally for their instance if they need to stay on prior behavior
+   temporarily.
 
-A feature MUST NOT skip the Beta tenants stage for any change classified as
+A feature MUST NOT skip the Beta stage for any change classified as
 non-trivial risk above. A feature MAY skip directly to GA only for low-risk,
 purely additive, easily reversible changes.
 
@@ -125,11 +135,14 @@ Every release MUST have a documented rollback plan before it ships, covering:
 A release without a documented rollback plan fails the production readiness
 gate in [`../checklists/production-readiness-checklist.md`](../checklists/production-readiness-checklist.md).
 
-## What ZodiCore provides vs. what a product customizes
+## What the base codebase provides vs. what a product customizes
 
-ZodiCore provides: the feature flag storage/evaluation mechanism, the
-changelog-to-docs sync used by [documentation-template.md](./documentation-template.md),
-and the release-notes publishing pipeline.
+The base codebase and shared component library (see
+[`../architecture/base-codebase-strategy.md`](../architecture/base-codebase-strategy.md))
+provide: the feature flag storage/evaluation mechanism, the changelog-to-docs
+sync used by [documentation-template.md](./documentation-template.md), and
+the release-notes publishing pipeline — all running inside the product's own
+codebase.
 
 A product customizes: its own changelog content, release notes content,
 rollout stage durations, and which features are classified as non-trivial

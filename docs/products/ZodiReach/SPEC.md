@@ -10,8 +10,9 @@
 ZodiReach is the marketing automation and omnichannel outreach system for
 organizations that need to segment their audience, run email/SMS/push
 campaigns and drip sequences, and prove attribution — without sacrificing
-deliverability or violating consent law — using the same customer data
-already living in their Zodize products rather than a re-exported CSV.
+deliverability or violating consent law — using a first-party sync
+connector into the customer data already living in their other Zodize
+products, rather than a hand-maintained, re-exported CSV.
 
 ## 2. Purpose
 
@@ -28,25 +29,29 @@ the first place.
 
 Mid-market to enterprise marketing teams running email/SMS/push programs at
 volume (10K–10M+ contacts), particularly those already running another
-Zodize product (e.g. [ZodiCommerce](../ZodiCommerce/SPEC.md),
-[ZodiBusiness](../ZodiBusiness/SPEC.md)) who want outreach built on the same
-customer/contact data rather than syncing it to a third-party ESP.
+Zodize product on their own hosting (e.g.
+[ZodiCommerce](../ZodiCommerce/SPEC.md),
+[ZodiBusiness](../ZodiBusiness/SPEC.md)) who want outreach built on a
+first-party sync connector to that product's customer/contact data rather
+than a manually maintained export to a third-party ESP.
 
 ## 4. Industries
 
 Cross-industry — retail/e-commerce (post-purchase and abandoned-cart
 flows), SMB services (appointment/renewal reminders), and any product with a
-contact/customer base needing lifecycle marketing; deepest native
-integration is with [ZodiCommerce](../ZodiCommerce/SPEC.md) customer/order
-data and [ZodiBusiness](../ZodiBusiness/SPEC.md) CRM contacts.
+contact/customer base needing lifecycle marketing; the deepest first-party
+sync connectors are for [ZodiCommerce](../ZodiCommerce/SPEC.md) customer/
+order data and [ZodiBusiness](../ZodiBusiness/SPEC.md) CRM contacts, each a
+separately deployed product ZodiReach connects to over its API (§22), not a
+shared database.
 
 ## 5. Competitor Analysis
 
 | Capability | Comparable to | Zodize differentiation |
 |---|---|---|
-| Email/SMS marketing automation | Klaviyo, Iterable | Native access to ZodiCommerce order/customer data, no data-sync connector required |
-| Enterprise marketing automation | HubSpot Marketing Hub, Marketo | Segmentation and consent share ZodiCore's tenant/RBAC model instead of a separate marketing-cloud login |
-| Transactional + marketing send infrastructure | Braze | One notification fabric (ZodiCore's) powers both product notifications and marketing sends, avoiding duplicate infrastructure |
+| Email/SMS marketing automation | Klaviyo, Iterable | A first-party, purpose-built sync connector into ZodiCommerce order/customer data, instead of a generic third-party ESP integration |
+| Enterprise marketing automation | HubSpot Marketing Hub, Marketo | Segmentation and consent share the product's own inherited RBAC model instead of a separate marketing-cloud login |
+| Transactional + marketing send infrastructure | Braze | One notification fabric, inherited from the base codebase, powers both product notifications and marketing sends within this one deployment, avoiding duplicate infrastructure |
 | Deliverability/reputation management | SendGrid/Twilio SendGrid deliverability tooling | Sender reputation monitoring built into the campaign send pipeline, not a bolt-on dashboard |
 | A/B testing and attribution | Mailchimp, Braze experimentation | Attribution ties directly to ZodiCommerce order records for real revenue attribution, not just click-through proxies |
 
@@ -144,40 +149,61 @@ Inherits the baseline in
 [security-standards.md](../../security/security-standards.md).
 ZodiReach-specific additions:
 
-- Segment evaluation against a 5-million-contact tenant must complete
+- Segment evaluation against a 5-million-contact deployment must complete
   within 30 seconds for a live/dynamic segment used at send-time.
 - Suppression-list checks are a hard gate on the send pipeline: no send may
   be dispatched to a contact without a suppression check completing
   successfully immediately beforehand — a suppression-service outage halts
   sends rather than failing open.
 - Campaign send throughput must sustain at least 1 million email sends per
-  hour per tenant during peak campaign windows without degrading
-  concurrent tenants' send queues.
+  hour per deployment during peak campaign windows without degrading other
+  work on the same install's queue.
 
 ## 11. Architecture
 
-ZodiReach is a tenant application on [ZodiCore](../ZodiCore/SPEC.md),
-consuming identity, permissions, and the shared notification fan-out
-infrastructure (`zodize/core-notifications`) per
-[architecture/overview.md](../../architecture/overview.md) — marketing sends
-and transactional product notifications share the same underlying delivery
-infrastructure but are logically separated by purpose (marketing sends are
-subject to consent/suppression gating; transactional notifications are not).
-ZodiReach can read contact and order data from other Zodize tenant products
-(e.g. [ZodiCommerce](../ZodiCommerce/SPEC.md) customers/orders,
-[ZodiBusiness](../ZodiBusiness/SPEC.md) CRM contacts) within the same tenant
-boundary via a read-scoped internal data contract, rather than requiring a
-data export/import connector — this is the product's core differentiation
-versus a bolt-on third-party ESP. The send pipeline is a queue-driven worker
-architecture separated from the segmentation/campaign-authoring API so a
-large send doesn't degrade campaign-builder responsiveness.
+ZodiReach is built by cloning the sanitized base codebase and running the
+[genericization checklist](../../architecture/product-genericization-checklist.md):
+the banking-specific `loans`/`dps`/`fdr`/`branches`/`branch_staff`/
+`other_banks`/`beneficiaries`/`airtime` tables are stripped, and the
+`branch_staff` guard is dropped by default. ZodiReach inherits the base
+engine's notification dispatcher (`App\Notify\Notify`, already integrated
+with Mailjet, MessageBird, SendGrid, Twilio, and Vonage — see
+[base-codebase-strategy.md](../../architecture/base-codebase-strategy.md)),
+RBAC/auth, i18n, and admin configuration surface unmodified, then layers its
+own Contacts, Segmentation, Campaigns, Automation, Testing, Deliverability,
+Consent, and Analytics modules (§13) on top. Marketing sends and
+transactional product notifications share the same inherited delivery
+infrastructure within this one deployment but are logically separated by
+purpose (marketing sends are subject to consent/suppression gating;
+transactional notifications are not). There is no shared tenant boundary and
+no ZodiCore platform dependency: each ZodiReach deployment is one
+organization's standalone, self-hosted instance, per
+[single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md).
+
+ZodiReach reads contact and order data from other, separately-deployed
+Zodize products (e.g. [ZodiCommerce](../ZodiCommerce/SPEC.md)
+customers/orders, [ZodiBusiness](../ZodiBusiness/SPEC.md) CRM contacts) via a
+first-party, read-scoped API sync connector each ZodiReach deployment is
+configured with from its admin panel (the source product's own API, secured
+by an API token the organization generates in that product's admin panel) —
+not a shared database, shared tenant boundary, or any runtime dependency on
+the other product being reachable for ZodiReach's own core functions
+(segmentation, sending, consent) to work. This connector-based integration,
+kept current on a scheduled sync job rather than real-time shared state, is
+the product's differentiation versus a bolt-on third-party ESP requiring a
+manually maintained CSV export; see §22. The send pipeline is a queue-driven
+worker architecture separated from the segmentation/campaign-authoring API
+so a large send doesn't degrade campaign-builder responsiveness.
 
 ## 12. Technology
 
-Laravel (PHP) + Vue per
-[coding-standards-php-laravel.md](../../development/coding-standards-php-laravel.md)
-and [coding-standards-vue.md](../../development/coding-standards-vue.md);
-PostgreSQL + Redis per
+Laravel (PHP) per the base codebase's stack (Laravel 11, PHP ^8.3, Vite 5) —
+see
+[base-codebase-strategy.md](../../architecture/base-codebase-strategy.md) —
+following
+[coding-standards-php-laravel.md](../../development/coding-standards-php-laravel.md);
+MySQL/MariaDB + Redis (where the buyer's hosting supports it, with a
+database-queue fallback) per
 [database-standards.md](../../development/database-standards.md); a
 dedicated high-throughput queue worker pool for campaign sends, decoupled
 from the general application queue so a large marketing send cannot starve
@@ -201,19 +227,28 @@ provider abstraction in §22.
 
 | Entity | Key columns |
 |---|---|
-| `contacts` | id, tenant_id, email, phone, source, consent_status, created_at |
+| `contacts` | id, email, phone, source, consent_status, created_at |
 | `contact_events` | id, contact_id, event_type, occurred_at, metadata (jsonb) |
-| `segments` | id, tenant_id, name, definition (jsonb), mode (dynamic/static) |
-| `campaigns` | id, tenant_id, name, channel, status, scheduled_at, sent_at |
+| `segments` | id, name, definition (jsonb), mode (dynamic/static) |
+| `campaigns` | id, name, channel, status, scheduled_at, sent_at |
 | `campaign_variants` | id, campaign_id, variant_label, subject, content_ref, is_winner |
 | `campaign_sends` | id, campaign_id, contact_id, variant_id, status, delivered_at |
-| `automations` | id, tenant_id, name, trigger_event, status |
+| `automations` | id, name, trigger_event, status |
 | `automation_steps` | id, automation_id, step_order, type (send/wait/branch), config |
 | `automation_enrollments` | id, automation_id, contact_id, current_step_id, enrolled_at |
 | `consent_records` | id, contact_id, topic, opted_in_at, opted_out_at, source |
-| `suppressions` | id, tenant_id, contact_id, reason, suppressed_at |
-| `sending_domains` | id, tenant_id, domain, reputation_score, warmup_status |
+| `suppressions` | id, contact_id, reason, suppressed_at |
+| `sending_domains` | id, domain, reputation_score, warmup_status |
 | `attribution_events` | id, campaign_send_id, order_id, attributed_revenue, attributed_at |
+| `sync_connections` | id, source_product (zodicommerce/zodibusiness/custom), base_url, api_token_ref, last_synced_at |
+
+`sync_connections` holds the admin-configured connection details for each
+first-party sync connector (§11, §22) an organization sets up to a
+separately-deployed Zodize product — API base URL and an encrypted reference
+to the API token generated in that product's own admin panel, never that
+product's database credentials. This deployment models exactly one
+organization's contact/campaign data; there is no `tenant_id` scoping
+column on any table above.
 
 ## 15. Key API Endpoints
 
@@ -260,19 +295,27 @@ All channels follow
 [email-sms-standards.md](../../standards/email-sms-standards.md) and
 [notification-standards.md](../../standards/notification-standards.md). Note
 that ZodiReach's own operational notifications above are transactional and
-distinct from the marketing sends it dispatches on the tenant's behalf.
+distinct from the marketing sends it dispatches on the organization's
+behalf.
 
 ## 18. Permissions & Roles
 
-Extends ZodiCore's default roles
-([rbac-permissions.md](../../security/rbac-permissions.md#default-system-roles))
-with: `segments.manage`, `campaigns.create`, `campaigns.send`,
-`automations.manage`, `consent.manage`, `suppressions.manage`,
-`deliverability.manage`. `campaigns.send` is separated from
-`campaigns.create` so a Campaign Coordinator can build a send but require a
-Marketing Manager to actually dispatch it, per the approval chain in §19.
-`consent.manage` and `suppressions.manage` are restricted to the Compliance
-Officer role by default.
+Built on the base engine's inherited `Role`/`Permission` RBAC (not Spatie),
+per
+[admin-template.md](../../templates/admin-template.md#roles--permissions-inherited-not-spatie).
+ZodiReach's `DemoSeeder` ships its own default admin roles — Marketing
+Manager, Campaign Coordinator, Compliance/Privacy Officer, and
+Deliverability Specialist — each granted a subset of ZodiReach's
+product-specific permissions: `segments.manage`, `campaigns.create`,
+`campaigns.send`, `automations.manage`, `consent.manage`,
+`suppressions.manage`, `deliverability.manage`. `campaigns.send` is
+separated from `campaigns.create` so a Campaign Coordinator can build a send
+but require a Marketing Manager to actually dispatch it, per the approval
+chain in §19. `consent.manage` and `suppressions.manage` are restricted to
+the Compliance Officer role by default. An organization can create
+additional custom roles and reassign any permission from the admin panel
+with no code change, per
+[admin-configuration-baseline.md](../../standards/admin-configuration-baseline.md#roles--permissions).
 
 ## 19. Workflows & Approval Chains
 
@@ -296,8 +339,9 @@ Officer role by default.
 
 Every segment definition change, campaign send, consent status change,
 suppression addition/removal, and deliverability pause/resume is recorded to
-ZodiCore's shared audit log with actor, timestamp, and before/after state,
-per [audit-logging.md](../../security/audit-logging.md). Consent history is
+this deployment's own audit log with actor, timestamp, and before/after
+state, per [audit-logging.md](../../security/audit-logging.md). Consent
+history is
 additionally retained as its own permanent, non-purgeable audit trail per
 contact (opt-in source and timestamp, every opt-out event) to support
 regulatory proof-of-consent requirements even after a contact is deleted
@@ -318,22 +362,24 @@ per [dashboard-standards.md](../../standards/dashboard-standards.md).
   provider-abstraction layer supporting multi-provider failover.
 - **SMS delivery providers**: Twilio, MessageBird.
 - **Push notification delivery**: Firebase Cloud Messaging, Apple Push
-  Notification service, via the same fan-out infrastructure ZodiCore uses
-  for product push notifications.
+  Notification service, via this deployment's own inherited fan-out
+  infrastructure for product push notifications.
 - **Deliverability/reputation tooling**: integration with mailbox-provider
   feedback loops (Gmail Postmaster Tools-class signals, ISP complaint feeds).
-- **Commerce/CRM data sources**: native read access to
-  [ZodiCommerce](../ZodiCommerce/SPEC.md) order/customer data and
-  [ZodiBusiness](../ZodiBusiness/SPEC.md) CRM contacts within the same
-  tenant.
+- **Commerce/CRM data sources**: a first-party sync connector (§11) reading
+  from a separately-deployed [ZodiCommerce](../ZodiCommerce/SPEC.md)
+  instance's order/customer data or a separately-deployed
+  [ZodiBusiness](../ZodiBusiness/SPEC.md) instance's CRM contacts, over that
+  product's own API and an admin-generated API token — configured per
+  connection in `sync_connections` (§14), not a shared database.
 
 ## 23. AI Features
 
 - AI-assisted subject-line and copy suggestions within the campaign builder,
   always presented as an editable draft.
 - Send-time optimization: predicts the best send time per contact based on
-  historical engagement patterns, applied only when the tenant opts into
-  send-time-optimization mode for a campaign.
+  historical engagement patterns, applied only when the organization opts
+  into send-time-optimization mode for a campaign.
 - Churn-risk segment suggestion: surfaces a candidate "at-risk" segment
   based on declining engagement/purchase recency, offered as a
   one-click-create segment rather than an automatic action.
@@ -349,7 +395,7 @@ per [dashboard-standards.md](../../standards/dashboard-standards.md).
 
 ## 25. Seed/Demo Data
 
-`DemoSeeder` provisions a demo tenant with 10,000 seeded contacts with
+`DemoSeeder` provisions a demo deployment with 10,000 seeded contacts with
 varied consent states and behavioral event history, 3 saved segments (one
 dynamic, one static), 2 completed campaigns with realistic
 delivery/open/click metrics and one recorded A/B test result, one active
@@ -369,9 +415,13 @@ pre-aggregated rollup tables rather than querying raw send records live.
 
 Full baseline from
 [security-standards.md](../../security/security-standards.md) applies.
-Contact PII and consent records are tenant-isolated per
-[multi-tenancy.md](../../architecture/multi-tenancy.md); suppression-list
-enforcement is implemented as a non-bypassable gate in the send pipeline
+Contact PII and consent records belong to this one deployment's single
+organization by construction — see
+[single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md) —
+and the sync connector to another Zodize product (§11, §22) is read-scoped
+and credentialed with an API token the organization controls and can revoke
+at any time from either product's admin panel. Suppression-list enforcement
+is implemented as a non-bypassable gate in the send pipeline
 (§10, §11) — no API path, including CLI-triggered sends, may dispatch to a
 suppressed contact, per
 [data-protection-privacy.md](../../security/data-protection-privacy.md).
@@ -444,9 +494,17 @@ defect.
 
 ## Roadmap (spec depth)
 
-This spec is Foundation-depth. Queued for Deep-depth expansion: a full ER
-diagram covering multi-step automation branching state and attribution
-windowing tables, the complete endpoint catalog (template management,
-inbound webhook event types), and a dedicated
-`DATA_MODEL.md`/`API_REFERENCE.md` pair matching
+This spec is Foundation-depth. Its Architecture, Core Data Model, and
+Integrations sections were revised to the standalone, self-hosted,
+single-tenant base-codebase model described in
+[architecture/overview.md](../../architecture/overview.md) and
+[single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md) —
+notably, ZodiReach's cross-product data access is now a first-party API sync
+connector between independently deployed products rather than shared-tenant
+internal data access. The connector's authentication model, sync frequency,
+and conflict/staleness handling are queued for Deep-depth specification.
+Also queued for Deep-depth expansion: a full ER diagram covering multi-step
+automation branching state and attribution windowing tables, the complete
+endpoint catalog (template management, inbound webhook event types), and a
+dedicated `DATA_MODEL.md`/`API_REFERENCE.md` pair matching
 [ZodiCore](../ZodiCore/SPEC.md)'s companion-document structure.

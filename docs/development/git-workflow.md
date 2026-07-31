@@ -6,7 +6,7 @@ Trunk-based development with short-lived feature branches:
 
 - `main` is always deployable. Every commit on `main` has passed full CI.
 - Feature branches: `type/short-description` (e.g. `feat/invoice-void-flow`,
-  `fix/tenant-scope-leak`, `chore/upgrade-laravel`), branched from `main`,
+  `fix/webhook-retry-loop`, `chore/upgrade-laravel`), branched from `main`,
   merged back via PR within a few days — long-lived branches are a smell
   that indicates a feature should be split or flagged.
 - Release branches (`release/2026.08`) are cut only for products on a

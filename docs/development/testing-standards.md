@@ -7,7 +7,7 @@
 | Unit | Pest/PHPUnit | Services, single-responsibility classes, Vue composables (Vitest) | Every Service method's happy path + every distinct business-rule branch |
 | Feature/API | Pest/PHPUnit + Laravel HTTP testing | Full HTTP request → response, including auth/authorization | Every endpoint: happy path, validation failure, authorization denial (mandatory), not-found |
 | Component | Vitest + Vue Testing Library | Vue components in isolation | Every `base/` component; any `modules/` component with conditional rendering or logic |
-| End-to-end | Playwright | Full browser, real backend (test tenant) | Every critical path in the product spec's "User Journeys" section |
+| End-to-end | Playwright | Full browser, real backend (test deployment/database) | Every critical path in the product spec's "User Journeys" section |
 | Contract | Schemathesis/Dredd-class tool | API responses vs. OpenAPI spec | Every endpoint, run in CI |
 
 ## Non-negotiable test cases
@@ -20,10 +20,18 @@ Every mutating API endpoint's feature test suite must include, at minimum:
    — see [rbac-permissions.md](../security/rbac-permissions.md). This case
    is mandatory precisely because it is the one most often skipped and the
    one most often exploited.
-4. Cross-tenant isolation: a request authenticated as Tenant A cannot read
-   or mutate Tenant B's resource, even by guessing a valid UUID.
-5. Not-found (404) for a nonexistent or soft-deleted (without
+4. Not-found (404) for a nonexistent or soft-deleted (without
    `with_trashed`) resource.
+5. On a product with multi-company/multi-branch scoping (see
+   [localization-i18n.md](../standards/localization-i18n.md#multi-company--multi-branch-data-scoping)):
+   a request authenticated as a staff member of one branch cannot read or
+   mutate another branch's resource, even by guessing a valid UUID, unless
+   they hold cross-branch permission.
+
+There is no cross-tenant isolation test category — every product's schema
+already belongs to exactly one business, so there is no second tenant's data
+in the same running application to leak into. See
+[single-tenant-deployment-model.md](../architecture/single-tenant-deployment-model.md#what-single-tenant-changes-in-the-data-model).
 
 ## Test data
 

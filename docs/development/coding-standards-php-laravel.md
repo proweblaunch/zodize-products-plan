@@ -52,9 +52,14 @@ needed for isolated unit testing — inject the underlying contract instead.
 ## Eloquent conventions
 
 - Every model declares `$fillable` explicitly (never `$guarded = []`).
-- Every tenant-scoped model uses a global scope for tenant isolation — see
-  [multi-tenancy.md](../architecture/multi-tenancy.md). Never rely on every
-  query manually adding a `where('tenant_id', ...)`.
+- No `tenant_id` global scope anywhere — every product's schema already
+  models exactly one business's data, so there is nothing to scope against;
+  see
+  [single-tenant-deployment-model.md](../architecture/single-tenant-deployment-model.md#what-single-tenant-changes-in-the-data-model).
+  A model belonging to a product with multi-company/multi-branch scope uses
+  a global scope keyed on `company_id`/`branch_id` instead, per
+  [localization-i18n.md](../standards/localization-i18n.md#multi-company--multi-branch-data-scoping) —
+  never rely on every query manually adding that `where(...)` clause.
 - Relationships are typed with return type declarations
   (`public function invoices(): HasMany`).
 - No business logic in Eloquent model `boot()` beyond simple, obvious

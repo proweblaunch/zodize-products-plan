@@ -11,10 +11,13 @@
 ZodiFleet is the operating system for a commercial vehicle fleet — vehicle
 registry and driver assignment, live GPS/telematics tracking, preventive and
 reactive maintenance scheduling, fuel/spend control, route optimization, and
-regulatory compliance (inspections, hours-of-service) — built on the same
-ZodiCore foundation ([SPEC.md](../ZodiCore/SPEC.md)) every Zodize product
-shares, so a fleet operator gets enterprise identity, multi-depot tenancy,
-and billing without integrating a separate telematics vendor's back office.
+regulatory compliance (inspections, hours-of-service) — built as a
+standalone, self-hosted Laravel application from the shared Zodize base
+codebase
+([base-codebase-strategy.md](../../architecture/base-codebase-strategy.md)),
+so a fleet operator gets a working admin back office, RBAC, and multi-depot
+data scoping without integrating a separate telematics vendor's back
+office.
 
 ## 2. Purpose
 
@@ -48,7 +51,7 @@ passenger transport/paratransit fleets.
 | Fleet management software | Fleetio, Verizon Connect Fleet | Compliance (HOS/inspections) and maintenance unified with core fleet ops, not a separate module purchase |
 | Maintenance/CMMS for fleets | Fleetio Maintenance, Whip Around | Preventive scheduling driven by the same telematics odometer/engine-hour data, no manual sync |
 | Route optimization | Route4Me, OptimoRoute | Native to the same platform holding driver HOS and vehicle constraints, producing compliant routes by construction |
-| ELD/HOS compliance | KeepTruckin/Motive (compliance side) | Enterprise RBAC, audit trail, and multi-depot tenancy inherited from ZodiCore from day one |
+| ELD/HOS compliance | KeepTruckin/Motive (compliance side) | Enterprise RBAC, audit trail, and multi-depot data scoping inherited from the base engine from day one |
 
 ## 6. Personas
 
@@ -161,20 +164,40 @@ constraint.
 
 ## 11. Architecture
 
-ZodiFleet is a tenant application on ZodiCore
-([architecture/overview.md](../../architecture/overview.md)), consuming
-`zodize/core-identity`, `zodize/core-billing`, `zodize/core-notifications`,
-`zodize/core-permissions`, and `zodize/core-plugins` as Composer packages.
-Depots/terminals are modeled as ZodiCore `branches` under a fleet operator
-tenant (per [multi-tenancy.md](../../architecture/multi-tenancy.md)),
-enabling multi-depot operators to manage vehicles and drivers with
-depot-scoped data isolation and fleet-wide roll-up reporting. Telematics
-hardware integration is implemented behind a `TelematicsConnectorContract`
-so ZodiFleet's core data model (vehicles, trips, events) is vendor-neutral;
-each connector normalizes a hardware vendor's data feed into ZodiFleet's
-canonical trip/event schema, with high-frequency location/event ingestion
-routed through a dedicated write-optimized pipeline decoupled from the
-transactional data model, per
+ZodiFleet is a standalone, self-hosted Laravel application, sold as source
+code to one fleet operator and deployed entirely within that buyer's own
+hosting account — there is no shared platform service and no other Zodize
+product it depends on at runtime
+([single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md)).
+It is built by cloning the sanitized base codebase and running the
+[genericization checklist](../../architecture/product-genericization-checklist.md):
+the banking-specific tables (`loans`, `dps`, `fdr`, `other_banks`,
+`beneficiaries`, `airtime_operators`) are stripped, and ZodiFleet's own
+domain modules — vehicle registry, driver management, telematics,
+maintenance, fuel, routing, compliance, incidents — are built on top of the
+inherited engine's wallet/ledger, payment gateways, RBAC/auth, KYC, i18n,
+and admin configuration surface (see
+[base-codebase-strategy.md](../../architecture/base-codebase-strategy.md)
+and
+[admin-configuration-baseline.md](../../standards/admin-configuration-baseline.md)).
+
+A multi-depot operator re-purposes the base's branch-scoped staff guard
+rather than the base's banking `BranchStaff` code: per
+[product-genericization-checklist.md §4](../../architecture/product-genericization-checklist.md#step-4--confirm-guard-configuration-matches-the-products-needs),
+ZodiFleet re-adds a `branch_staff`-equivalent guard scoped to a depot, so
+depot-level dispatchers and maintenance staff can be restricted to their
+depot's vehicles and drivers while a Fleet Manager/Compliance Officer role
+sees across all depots in the one deployment. Depots/terminals are modeled
+as `branches` per
+[localization-i18n.md](../../standards/localization-i18n.md#multi-company--multi-branch-data-scoping)
+— this is data scoping within one buyer's one deployment, not
+multi-tenancy; there is no `tenant_id` anywhere in ZodiFleet's schema.
+Telematics hardware integration is implemented behind a
+`TelematicsConnectorContract` so ZodiFleet's core data model (vehicles,
+trips, events) is vendor-neutral; each connector normalizes a hardware
+vendor's data feed into ZodiFleet's canonical trip/event schema, with
+high-frequency location/event ingestion routed through a dedicated
+write-optimized pipeline decoupled from the transactional data model, per
 [caching-queues-events.md](../../architecture/caching-queues-events.md).
 
 ## 12. Technology
@@ -204,11 +227,17 @@ inspections, HOS logging, and incident reporting.
 
 ## 14. Core Data Model
 
+All tables belong to the one buyer's one deployment — there is no
+`tenant_id` column anywhere in this model
+([single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md)).
+A multi-depot operator scopes vehicles and drivers via `depot_id` (the base
+engine's re-purposed `branches` table).
+
 | Entity | Key columns | Notes |
 |---|---|---|
-| `vehicles` | id, tenant_id, depot_id, vin, make, model, year, status | Maps depot to ZodiCore `branch` |
+| `vehicles` | id, depot_id, vin, make, model, year, status | `depot_id` FK to the inherited `branches` table |
 | `telematics_devices` | id, vehicle_id, external_device_id, vendor, status | Pairing record for a `TelematicsConnectorContract` |
-| `drivers` | id, tenant_id, user_id, license_number, license_class, status | FK to ZodiCore `users` for the driver's login identity |
+| `drivers` | id, user_id, license_number, license_class, status | FK to the inherited `users` table for the driver's login identity |
 | `vehicle_assignments` | id, vehicle_id, driver_id, assigned_at, released_at | Current/historical driver-vehicle pairing |
 | `trips` | id, vehicle_id, driver_id, started_at, ended_at, start_location, end_location, distance | Aggregated trip derived from telematics events |
 | `telematics_events` | id, vehicle_id, event_type, occurred_at, location, value | Harsh braking, speeding, idle, position ping (high volume) |
@@ -275,9 +304,9 @@ All channels follow
 
 ## 18. Permissions & Roles
 
-Inherits ZodiCore default roles
-([rbac-permissions.md](../../security/rbac-permissions.md#default-system-roles))
-scoped per depot. ZodiFleet-specific permissions: `vehicles.manage`,
+Inherits the base codebase's default admin roles
+([rbac-permissions.md](../../security/rbac-permissions.md#default-system-roles)),
+scoped per depot via the `branch_staff`-equivalent guard. ZodiFleet-specific permissions: `vehicles.manage`,
 `drivers.manage`, `assignments.manage`, `work_orders.manage`,
 `work_orders.return_to_service` (elevated — requires Maintenance Manager+),
 `routes.plan`, `hos.manage`, `hos.override_violation` (elevated — requires
@@ -301,8 +330,9 @@ fleet-wide data.
 ## 20. Audit Logs
 
 Every vehicle status change, work order status change, HOS log entry and
-violation override, and incident status change is recorded to the ZodiCore
-audit log with actor, timestamp, before/after values, and depot scope —
+violation override, and incident status change is recorded to the
+deployment's audit log with actor, timestamp, before/after values, and
+depot scope —
 per [audit-logging.md](../../security/audit-logging.md). HOS logs and
 inspection records additionally carry an immutable, append-only history
 independent of general audit history, since they are the artifact produced
@@ -368,7 +398,7 @@ incident with corrective-action history — per
 ## 26. Performance Requirements
 
 See §10; additionally: the live fleet map supports at least 1,000
-concurrently tracked vehicles per tenant with sub-2-second position
+concurrently tracked vehicles per deployment with sub-2-second position
 refresh, and route optimization for a 50-stop route completes in under 10
 seconds.
 

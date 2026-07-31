@@ -57,28 +57,34 @@ control for `restricted` data.
   lower environment without field-level masking of every `confidential` and
   `restricted` column.
 
-## Data residency and multi-region
+## Data residency
 
-- Every tenant MUST have a declared data residency region at provisioning
-  time (see
-  [`../architecture/multi-tenancy.md#tenant-provisioning-and-deprovisioning`](../architecture/multi-tenancy.md)).
-  Primary data storage (database, object storage, backups) for that tenant
-  MUST remain within the declared region.
-- Products serving EU tenants MUST offer an EU-region deployment; products
-  serving tenants in jurisdictions with data-localization law (e.g. certain
-  government or banking contracts) MUST document the specific region
-  commitment in the tenant's contractual record, not just in infrastructure
-  config.
-- Cross-region replication for disaster recovery (see
+- Zodize does not host any product's data — the buyer provisions their own
+  shared/VPS hosting and, by choosing that hosting provider and region,
+  chooses their own data residency; see
+  [`../architecture/overview.md`](../architecture/overview.md#the-business-model-this-architecture-serves).
+  A product's deployment documentation MUST instruct the buyer to select a
+  hosting region matching their business's own regulatory jurisdiction
+  (e.g. an EU-based business selecting EU-region hosting for
+  data-localization law), and MUST document that this is the buyer's
+  infrastructure choice, not a Zodize-operated guarantee.
+- Products targeting jurisdictions with data-localization law (e.g. certain
+  government or banking contracts) MUST document, in the product's own
+  [`SPEC.md`](../products/), the specific residency guidance given to the
+  buyer during setup, not just leave it to the buyer's hosting provider's
+  default.
+- Cross-region backup replication for disaster recovery (see
   [`backup-disaster-recovery.md`](./backup-disaster-recovery.md)) MUST stay
-  within the same legal jurisdiction family as the primary region unless the
-  tenant has explicitly consented to broader replication.
+  within the same legal jurisdiction family as the buyer's chosen primary
+  hosting region unless the buyer has explicitly consented to broader
+  replication.
 
 ## GDPR/CCPA-equivalent rights
 
 Every product MUST implement the following as self-service features,
-available to any authenticated end user for their own data and to a tenant
-Admin/Owner for their tenant's data, without requiring a support ticket:
+available to any authenticated end user for their own data and to the
+business's own Admin/Owner for the business's data, without requiring a
+support ticket:
 
 - **Right to access/export**: a "Download my data" action that produces a
   machine-readable (JSON) export of the user's personal data within 30 days
@@ -100,8 +106,12 @@ Admin/Owner for their tenant's data, without requiring a support ticket:
 
 - Every resource type MUST have a documented retention period in the
   product's SPEC. In the absence of a longer regulatory requirement, the
-  default retention for operational business data is the life of the
-  tenant's subscription plus 90 days.
+  default retention for operational business data is indefinite, for as
+  long as the buyer continues to run and back up the deployment — the
+  buyer's own account/subscription-status data (where the product's own
+  domain models one, e.g. an end-customer's subscription in ZodiCore)
+  follows that resource's own documented retention, life-of-subscription
+  plus 90 days.
 - **Soft-delete standard**: user-facing deletions (a user deletes an
   invoice, a record, a document) default to a soft delete (`deleted_at`
   timestamp via Eloquent `SoftDeletes`), recoverable from a "Trash" view for
@@ -130,4 +140,4 @@ Admin/Owner for their tenant's data, without requiring a support ticket:
 - [`audit-logging.md`](./audit-logging.md)
 - [`backup-disaster-recovery.md`](./backup-disaster-recovery.md)
 - [`security-standards.md`](./security-standards.md)
-- [`../architecture/multi-tenancy.md`](../architecture/multi-tenancy.md)
+- [`../architecture/single-tenant-deployment-model.md`](../architecture/single-tenant-deployment-model.md)

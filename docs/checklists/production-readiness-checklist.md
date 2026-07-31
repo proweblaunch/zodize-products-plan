@@ -4,7 +4,7 @@ This is the go/no-go checklist a Zodize product MUST pass before General
 Availability. It is organized into a **Spec Complete** gate, which MUST pass
 before implementation begins per [`../../ROADMAP.md`](../../ROADMAP.md)
 Phase 4, and the full **GA** gate, which MUST pass before the product is
-opened to non-beta tenants. Every item MUST be independently verifiable —
+sold to non-beta buyers. Every item MUST be independently verifiable —
 "looks fine" is not a passing state. An unchecked item blocks release; there
 is no partial credit.
 
@@ -49,8 +49,9 @@ every item below.
       product pages.
 - [ ] Database queries on high-traffic endpoints reviewed for N+1 queries
       and missing indexes.
-- [ ] Load testing completed at the tenant/user volume defined in the
-      product's own SPEC.md.
+- [ ] Load testing completed at the user/record volume defined in the
+      product's own SPEC.md, against the shared/VPS hosting reference target
+      in [`../architecture/overview.md`](../architecture/overview.md#deployment-topology-per-product-per-buyer).
 - [ ] Background job queues sized and monitored per
       [`../templates/deployment-template.md`](../templates/deployment-template.md).
 
@@ -61,9 +62,13 @@ every item below.
 - [ ] Backup and restore procedure tested end-to-end, not just configured.
 - [ ] Data retention policy documented and enforced for every table
       containing personal data.
-- [ ] Tenant data isolation verified per
-      [`../architecture/multi-tenancy.md`](../architecture/multi-tenancy.md)
-      with an automated test asserting cross-tenant access is impossible.
+- [ ] The schema contains no `tenant_id` column, tenant global query scope,
+      or other multi-tenant construct, per
+      [`../architecture/single-tenant-deployment-model.md`](../architecture/single-tenant-deployment-model.md).
+- [ ] If the product supports multi-company/multi-branch scoping per
+      [`../standards/localization-i18n.md`](../standards/localization-i18n.md#multi-company--multi-branch-data-scoping),
+      cross-branch access without the requisite permission is impossible and
+      covered by an automated test.
 - [ ] Migration rollback strategy verified per
       [`../templates/deployment-template.md`](../templates/deployment-template.md).
 
@@ -86,7 +91,7 @@ every item below.
 
 - [ ] Admin/back-office tooling live per
       [`../templates/admin-template.md`](../templates/admin-template.md),
-      including impersonation, feature flags, system health, and support tools.
+      including the inherited admin sections, feature flags, and system health.
 - [ ] Support team trained on the product with access to admin support tools.
 - [ ] Status page live and linked from the marketing site footer.
 - [ ] Escalation path documented for production incidents.
@@ -109,7 +114,7 @@ every item below.
 - [ ] Release process followed per
       [`../templates/release-template.md`](../templates/release-template.md),
       including a documented rollback plan.
-- [ ] Feature flag rollout stages (internal, beta tenants, GA) completed in
+- [ ] Feature flag rollout stages (internal, beta buyers, GA) completed in
       order for any non-trivial-risk functionality.
 - [ ] Zero-downtime deploy verified in a staging rehearsal per
       [`../templates/deployment-template.md`](../templates/deployment-template.md).
