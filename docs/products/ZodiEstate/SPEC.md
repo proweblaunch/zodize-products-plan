@@ -216,15 +216,15 @@ if its own operations require it.
 
 ## 12. Technology
 
-Laravel + Vue per the shared stack
-([coding-standards-php-laravel.md](../../development/coding-standards-php-laravel.md),
-[coding-standards-vue.md](../../development/coding-standards-vue.md));
-PostgreSQL + Redis per
+Laravel 11 + PHP ^8.3 per the inherited base codebase
+([coding-standards-php-laravel.md](../../development/coding-standards-php-laravel.md)),
+with Blade/Vue for new module UI per
+[coding-standards-vue.md](../../development/coding-standards-vue.md);
+MySQL/MariaDB per the base codebase's inherited schema, matching
 [database-standards.md](../../development/database-standards.md); ACH/card
-processing via ZodiCore's payment gateway abstraction
-(§20 of [ZodiCore's SPEC.md](../ZodiCore/SPEC.md#20-payment-gateways-wallet-accounting-taxes-invoices));
-e-signature and tenant/applicant screening are third-party integrations
-(§22).
+processing via the inherited payment gateway abstraction (see
+[payment-gateways.md](../../standards/payment-gateways.md)); e-signature and
+tenant/applicant screening are third-party integrations (§22).
 
 ## 13. Modules & Submodules
 
@@ -243,21 +243,34 @@ e-signature and tenant/applicant screening are third-party integrations
 
 Full ER diagram queued (§ Roadmap). Core entities:
 
+Every entity below belongs to the one property management company that owns
+this deployment — there is no `tenant_id` column anywhere in this schema,
+per
+[single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md).
+`company_id` appears only where a firm operating multiple legal entities
+needs it, per
+[localization-i18n.md](../../standards/localization-i18n.md#multi-company--multi-branch-data-scoping).
+
 | Entity | Key columns |
 |---|---|
-| `properties` | id, tenant_id, company_id, name, address, property_type, owner_id |
+| `properties` | id, company_id (nullable — multi-entity firms only), name, address, property_type, owner_id |
 | `units` | id, property_id, unit_number, bedrooms, bathrooms, sqft, status (vacant/occupied/make_ready) |
-| `owners` | id, tenant_id, name, payout_bank_account_id, management_fee_pct |
+| `owners` | id, name, payout_bank_account_id, management_fee_pct |
 | `applicants` | id, listing_id, applicant_user_id, screening_status, decision, adverse_action_sent_at |
 | `leases` | id, unit_id, tenant_user_id, start_date, end_date, rent_amount, deposit_amount, status |
 | `lease_charges` | id, lease_id, charge_type, amount, due_date, recurrence_rule |
 | `tenant_ledger_entries` | id, lease_id, entry_type (charge/payment/fee/credit), amount, posted_at |
-| `trust_ledger_entries` | id, tenant_id, property_id, lease_id, entry_type, amount, account (deposit/owner_funds), posted_at |
+| `trust_ledger_entries` | id, property_id, lease_id, entry_type, amount, account (deposit/owner_funds), posted_at |
 | `disbursements` | id, owner_id or lease_id (former tenant), amount, method, disbursed_at, statutory_deadline |
 | `work_orders` | id, unit_id, priority, category, status, assigned_to_type (staff/vendor), created_by |
-| `vendors` | id, tenant_id, name, insurance_expires_at, trade_categories |
+| `vendors` | id, name, insurance_expires_at, trade_categories |
 | `inspections` | id, unit_id, lease_id, inspection_type (move_in/move_out/routine), photos, condition_notes |
 | `owner_statements` | id, owner_id, property_id, period_start, period_end, net_disbursed, pdf_document_id |
+
+Here `tenant_user_id` and `tenant_ledger_entries` use "tenant" in its
+real-estate sense (the renter occupying a unit) — unrelated to the
+deprecated SaaS-tenancy model above; this is standard domain vocabulary for
+a property management product and is retained as-is.
 
 ## 15. Key API Endpoints
 
@@ -267,7 +280,7 @@ Full endpoint catalog queued (§ Roadmap). Key routes, all conforming to
 
 | Method | Endpoint | Purpose |
 |---|---|---|
-| GET | `/api/v1/properties` | List properties in tenant scope |
+| GET | `/api/v1/properties` | List properties in this deployment |
 | POST | `/api/v1/properties/{property}/units` | Create a unit |
 | GET | `/api/v1/listings` | Public/portal listing search |
 | POST | `/api/v1/listings/{listing}/applications` | Submit rental application |
@@ -321,16 +334,19 @@ All channels follow
 
 ## 18. Permissions & Roles
 
-Inherits ZodiCore's default system roles
-([rbac-permissions.md](../../security/rbac-permissions.md#default-system-roles))
-plus ZodiEstate-specific roles: `Property Manager`, `Leasing Agent`,
+Built on the inherited `Role`/`Permission` engine and `admin` guard per
+[admin-template.md](../../templates/admin-template.md#roles--permissions-inherited-not-spatie),
+plus a re-purposed `branch_staff` guard (§11) for property-scoped field
+staff. ZodiEstate's own roles: `Property Manager`, `Leasing Agent`,
 `Maintenance Coordinator`, `Trust Administrator`, `Owner` (portal-only,
 scoped to their own properties), `Tenant` (portal-only, scoped to their own
 lease). Key permissions: `properties.manage`, `leases.approve`,
 `trust_ledger.post` (restricted to Trust Administrator and Owner-tier roles
 — never Leasing Agent), `disbursements.execute`, `work_orders.assign`,
-`screening.run`. Trust ledger posting permissions are enforced with a
-stricter approval requirement than standard CRUD per §19.
+`screening.run`, all registered into the inherited permission system per
+[permission-template.md](../../templates/permission-template.md). Trust
+ledger posting permissions are enforced with a stricter approval
+requirement than standard CRUD per §19.
 
 ## 19. Workflows & Approval Chains
 
@@ -340,7 +356,7 @@ stricter approval requirement than standard CRUD per §19.
   consistently.
 - **Trust disbursement approval**: any disbursement from the trust ledger
   (deposit return, owner payout) requires a second approver distinct from
-  the initiator when the amount exceeds the tenant-configured threshold —
+  the initiator when the amount exceeds an admin-configured threshold —
   a maker-checker control matching standard trust accounting practice.
 - **Large expense/work order approval**: vendor-billed work orders above a
   configured dollar threshold require Property Manager approval before the
@@ -372,8 +388,9 @@ supporting fair housing compliance review.
 - **Tenant screening**: credit, criminal, and eviction history providers
   (TransUnion SmartMove-class, integrated via a vendor abstraction so
   tenants can substitute providers).
-- **Payments**: ACH/card processing via ZodiCore's payment gateway
-  abstraction; integrated with tenant ledger and trust ledger posting.
+- **Payments**: ACH/card processing via the inherited base codebase's
+  payment gateway abstraction (§12); integrated with tenant ledger and trust
+  ledger posting.
 - **E-signature**: DocuSign/Adobe Sign-class provider for lease execution.
 - **Listing syndication**: outbound feed to listing aggregators.
 - **Accounting export**: QuickBooks/Xero-compatible export for firms that
@@ -391,8 +408,8 @@ supporting fair housing compliance review.
   screen that flags and blocks protected-class-referencing terms before
   publish.
 - Anomaly detection on trust ledger activity (unusual disbursement patterns)
-  surfaced to the Trust Administrator, extending ZodiCore's audit anomaly
-  detection (§23 of [ZodiCore's SPEC.md](../ZodiCore/SPEC.md#23-ai-features)).
+  surfaced to the Trust Administrator, built on ZodiEstate's own audit log
+  data per [audit-logging.md](../../security/audit-logging.md).
 
 ## 24. Automation, Scheduled Jobs, CLI Commands
 
@@ -401,8 +418,7 @@ supporting fair housing compliance review.
   disbursement deadline alerts, monthly owner statement generation.
 - CLI commands: `estate:generate-rent-roll`, `estate:assess-late-fees`,
   `estate:close-accounting-period`, `estate:reconcile-trust-account` — each
-  requiring the same authorization context as its API equivalent, per
-  ZodiCore's CLI authorization standard.
+  requiring the same authorization context as its API equivalent.
 
 ## 25. Seed Data, Demo Data
 
@@ -496,8 +512,12 @@ See [production-readiness-checklist.md](../../checklists/production-readiness-ch
 
 ## Roadmap (spec depth)
 
-This spec is Foundation-depth. Queued for Deep-depth expansion: full ER
-diagram and migration set (companion `DATA_MODEL.md`), full endpoint catalog
-(companion `API_REFERENCE.md`), complete jurisdiction-specific late-fee and
-notice rule library, and a full report catalog beyond the summary list in
-§21.
+This spec is Foundation-depth. Its Architecture (§11), Core Data Model
+(§14), and Permissions & Roles (§18) sections were revised to the
+standalone, self-hosted, single-tenant model in
+[single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md);
+no product-domain content (vision, personas, journeys, workflows) changed.
+Queued for Deep-depth expansion: full ER diagram and migration set
+(companion `DATA_MODEL.md`), full endpoint catalog (companion
+`API_REFERENCE.md`), complete jurisdiction-specific late-fee and notice rule
+library, and a full report catalog beyond the summary list in §21.

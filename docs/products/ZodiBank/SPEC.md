@@ -239,14 +239,17 @@ behind contracts (see §21) so no processor is hard-coded into ledger logic.
 ## 14. Core Data Model
 
 The 12 entities below are the load-bearing core; full ER diagram is queued
-(see [Roadmap (spec depth)](#roadmap-spec-depth)).
+(see [Roadmap (spec depth)](#roadmap-spec-depth)). There is no `tenant_id`
+column anywhere in this model — each deployed instance belongs to exactly
+one bank/credit union, per
+[single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md#what-single-tenant-changes-in-the-data-model).
 
 | Entity | Key columns |
 |---|---|
-| `deposit_accounts` | id, tenant_id, customer_id, product_type, account_number, routing_number, status, opened_at, overdraft_opt_in |
+| `deposit_accounts` | id, customer_id, product_type, account_number, routing_number, status, opened_at, overdraft_opt_in |
 | `ledger_entries` | id, account_id, entry_type (debit/credit), amount, currency, posted_at, batch_id, reversal_of_entry_id |
-| `ledger_batches` | id, tenant_id, source_type, source_reference, status, created_at |
-| `customers` | id, tenant_id, legal_name, dob, tax_id_hash, kyc_status, risk_score, screened_at |
+| `ledger_batches` | id, source_type, source_reference, status, created_at |
+| `customers` | id, legal_name, dob, tax_id_hash, kyc_status, risk_score, screened_at |
 | `cards` | id, account_id, customer_id, card_type (virtual/physical), pan_token, last4, status, expires_at |
 | `card_transactions` | id, card_id, merchant_name, mcc, amount, currency, auth_status, fraud_flagged, settled_at |
 | `payments` | id, account_id, rail (ach/wire), direction, amount, status, dual_control_approved_by, initiated_at |
@@ -254,7 +257,25 @@ The 12 entities below are the load-bearing core; full ER diagram is queued
 | `interest_accruals` | id, account_id, accrual_date, rate_apy, amount, capitalized_at |
 | `statements` | id, account_id, period_start, period_end, pdf_document_id, generated_at |
 | `fraud_cases` | id, transaction_id, rule_triggered, status, disposition, reviewed_by, reviewed_at |
-| `regulatory_reports` | id, tenant_id, report_type, period, status, generated_by, exported_at |
+| `regulatory_reports` | id, report_type, period, status, generated_by, exported_at |
+
+**Multi-currency**: ZodiBank's primary target market (§3) is US-style
+digital banks, credit unions, and sponsor-bank programs reporting in one
+regulatory base currency, so `ledger_entries`/`card_transactions` record a
+`currency` column per row for historical accuracy but ZodiBank does **not**
+extend the base wallet engine into a multi-currency balances table by
+default — it remains single-base-currency per
+[ADR-0002](../../decisions/0002-single-currency-wallet-by-default.md). A
+buyer deploying ZodiBank to offer genuinely simultaneous multi-currency
+deposit accounts (e.g. a USD/EUR dual-currency account program) MUST extend
+the pattern explicitly, following
+[wallet-system.md's Multi-currency gap](../../standards/wallet-system.md#multi-currency-gap):
+add a product-specific `deposit_account_balances` table
+(`id`, `deposit_account_id`, `currency`, `balance`, `updated_at`) scoped per
+`deposit_account_id` rather than per customer, with its own append-only,
+post-balance-snapshot `deposit_account_ledger_entries` table mirroring the
+inherited `Transaction` model's invariants — never applied to the shared
+base engine globally.
 
 ## 15. Key API Endpoints
 
@@ -288,7 +309,7 @@ conform to [api-standards.md](../../development/api-standards.md) and
 
 ## 16. Events
 
-Domain events registered on ZodiCore's event bus (see
+Domain events registered on the inherited event bus (see
 [caching-queues-events.md](../../architecture/caching-queues-events.md)):
 `account.opened`, `account.closed`, `kyc.approved`, `kyc.declined`,
 `kyc.manual_review_required`, `ledger.entry_posted`, `ledger.entry_reversed`,
@@ -316,19 +337,22 @@ All channels follow
 
 ## 18. Permissions & Roles
 
-Extends [ZodiCore's default roles](../../security/rbac-permissions.md#default-system-roles)
-with banking-specific roles: `Bank Operations Manager`, `Compliance Officer`,
-`Card Program Manager`, `Fraud Analyst`, `Treasury Analyst`. Key
-permissions: `accounts.open`, `accounts.close`, `ledger.post`,
-`ledger.reverse` (restricted to Treasury Analyst/Compliance), `cards.issue`,
-`cards.block`, `payments.initiate`, `payments.approve` (never the same
-identity as `payments.initiate`, enforced per §19), `kyc.review`,
-`fraud.disposition`, `regulatory_reports.generate`. Full model per
+Built on the inherited `Role`/`Permission` engine per
+[admin-template.md](../../templates/admin-template.md), with
+banking-specific roles registered on top of the
+[default system roles](../../security/rbac-permissions.md#default-system-roles):
+`Bank Operations Manager`, `Compliance Officer`, `Card Program Manager`,
+`Fraud Analyst`, `Treasury Analyst`. Key permissions: `accounts.open`,
+`accounts.close`, `ledger.post`, `ledger.reverse` (restricted to Treasury
+Analyst/Compliance), `cards.issue`, `cards.block`, `payments.initiate`,
+`payments.approve` (never the same identity as `payments.initiate`,
+enforced per §19), `kyc.review`, `fraud.disposition`,
+`regulatory_reports.generate`. Full model per
 [rbac-permissions.md](../../security/rbac-permissions.md).
 
 ## 19. Workflows & Approval Chains
 
-- **Dual-control payment approval**: any ACH/wire above a tenant-configured
+- **Dual-control payment approval**: any ACH/wire above an admin-configured
   threshold requires approval from a user distinct from the initiator;
   self-approval is blocked at the policy layer, not just the UI.
 - **KYC manual review escalation**: applications that fail automated
@@ -346,7 +370,7 @@ identity as `payments.initiate`, enforced per §19), `kyc.review`,
 
 Every ledger post, reversal, account status change, KYC decision, card
 lifecycle transition, payment approval, and fraud disposition writes an
-immutable audit entry via ZodiCore's audit log
+immutable audit entry via the inherited audit log
 ([audit-logging.md](../../security/audit-logging.md)), capturing actor,
 timestamp, before/after state, and (for payments) both the initiator and
 approver identities. Ledger entries are additionally protected by database-
@@ -369,14 +393,15 @@ level append-only constraints so audit and ledger integrity cannot diverge.
 - **KYC/AML providers**: identity verification and document capture (e.g.
   Persona/Alloy/Socure-class vendors), sanctions/watchlist screening
   (OFAC-class screening providers), abstracted behind a
-  `KycProviderContract` so tenants can swap vendors without ledger changes.
+  `KycProviderContract` so a buyer can swap vendors without ledger changes.
 - **Card issuing/processing**: card issuer processor integration (Marqeta/
   Galileo/i2c-class) behind a `CardProcessorContract`.
 - **Payment rails**: ACH origination/receipt via an ACH processor
   integration, wire transfer via a correspondent-bank/Fedwire-class
   integration, abstracted behind a `PaymentRailContract`.
 - **Core banking / ledger reconciliation**: optional export connectors for
-  institutions running ZodiBank alongside a legacy core during migration.
+  institutions running ZodiBank's self-hosted deployment alongside a legacy
+  core during migration.
 - **Credit bureau / identity verification**: for products offering
   overdraft lines or secured credit, integrates with credit bureau APIs.
 - **Tax reporting**: 1099-INT-style annual summary export.
@@ -388,10 +413,10 @@ level append-only constraints so audit and ledger integrity cannot diverge.
   requiring human confirmation before a rule changes.
 - KYC risk-score explanation: for manual-review cases, summarizes in plain
   language which signals drove the risk score, to speed compliance review.
-- Anomalous-ledger-activity detection layered on top of ZodiCore's
-  audit-log anomaly detection ([ZodiCore §23](../ZodiCore/SPEC.md#23-ai-features)),
-  tuned for banking-specific patterns (e.g. structuring-like transaction
-  sequences) and routed to the Compliance queue.
+- Anomalous-ledger-activity detection layered on top of the inherited
+  audit log's anomaly detection, tuned for banking-specific patterns (e.g.
+  structuring-like transaction sequences) and routed to the Compliance
+  queue.
 
 ## 24. Automation, Scheduled Jobs, CLI Commands
 
@@ -401,11 +426,11 @@ level append-only constraints so audit and ledger integrity cannot diverge.
 - CLI commands (Artisan): `bank:accrue-interest`, `bank:generate-statements`,
   `bank:rescreen-customers`, `bank:reconcile-ledger`,
   `bank:generate-call-report` — each requires the same authorization context
-  as its API equivalent, per [ZodiCore §24](../ZodiCore/SPEC.md#24-automation-scheduled-jobs-cron-jobs-cli-commands).
+  as its API equivalent.
 
 ## 25. Seed/Demo Data
 
-`BankDemoSeeder` provisions a demo tenant with realistic checking/savings
+`BankDemoSeeder` provisions the demo deployment with realistic checking/savings
 products, 200+ synthetic customers with varied KYC states, 12 months of
 transaction and interest-accrual history, a populated fraud-case queue with
 resolved and open cases, and a full quarter of regulatory-report history —
@@ -431,19 +456,20 @@ applies, plus:
   integration only).
 - **SOC2-equivalent controls**: change management, access review cadence,
   and vendor risk management apply to every banking module, not only the
-  ZodiCore platform baseline.
+  inherited base engine.
 - **KYC/AML**: mandatory identity verification and sanctions screening
   before any account activates; periodic re-screening is enforced by
   scheduled job, not manual process.
 - **Immutable audit trails**: ledger and compliance-decision audit entries
   are append-only at the database layer, matching §20.
 - **MFA is mandatory, not optional**, for every human user role interacting
-  with ZodiBank — enforced at the tenant policy level per
+  with ZodiBank — enforced at the deployment's security policy level per
   [authentication-authorization.md](../../security/authentication-authorization.md),
   with no self-service opt-out available to Bank Operations, Compliance,
   Card Program, Fraud, or Treasury roles.
 - Dual control on payment approval (§19) is a security control, not merely
-  a workflow convenience, and cannot be disabled by a tenant admin.
+  a workflow convenience, and cannot be disabled by an admin of the
+  deployment.
 
 ## 28. Testing Requirements
 
@@ -455,10 +481,11 @@ that must pass before any payments-module release.
 
 ## 29. Deployment Requirements
 
-Per [deployment-template.md](../../templates/deployment-template.md).
-Ledger-posting and card-authorization services deploy with the same
-zero-downtime requirement as ZodiCore's identity/billing services
-([ZodiCore §29](../ZodiCore/SPEC.md#29-deployment-requirements)), since an
+Per [deployment-template.md](../../templates/deployment-template.md), onto
+the buyer's own shared/VPS hosting per
+[single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md).
+Ledger-posting and card-authorization services deploy with a stricter
+zero-downtime requirement than the general product baseline, since an
 authorization outage blocks accountholder spend in real time.
 
 ## 30. Acceptance Criteria
@@ -481,8 +508,8 @@ See [production-readiness-checklist.md](../../checklists/production-readiness-ch
 and [security-checklist.md](../../checklists/security-checklist.md).
 ZodiBank additionally requires sign-off from a compliance stakeholder that
 KYC/AML, dual-control payment approval, and regulatory reporting have been
-validated against the tenant's actual chartering/sponsor-bank requirements
-before go-live.
+validated against the buyer institution's actual chartering/sponsor-bank
+requirements before go-live.
 
 ## 32. Future Roadmap
 
@@ -511,9 +538,14 @@ before go-live.
 
 ## Roadmap (spec depth)
 
+This spec's Architecture and Core Data Model sections were revised to
+reflect the corrected standalone, self-hosted, single-tenant deployment
+model — see
+[single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md)
+and [base-codebase-strategy.md](../../architecture/base-codebase-strategy.md).
 This spec is Foundation-depth. Queued for Deep-depth expansion: a full ER
 diagram and migration set for the ledger and compliance schema (companion
-`DATA_MODEL.md`), a complete endpoint catalog (companion `API_REFERENCE.md`)
-matching [ZodiCore's structure](../ZodiCore/SPEC.md), and a full regulatory
-report catalog covering additional jurisdictions beyond the US call-report
-format. Changes follow [CONTRIBUTING.md](../../../CONTRIBUTING.md).
+`DATA_MODEL.md`), a complete endpoint catalog (companion `API_REFERENCE.md`),
+and a full regulatory report catalog covering additional jurisdictions
+beyond the US call-report format. Changes follow
+[CONTRIBUTING.md](../../../CONTRIBUTING.md).

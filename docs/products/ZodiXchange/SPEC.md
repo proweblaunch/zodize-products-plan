@@ -8,9 +8,18 @@
 > this document. See [PRODUCT_CATALOG.md](../../../PRODUCT_CATALOG.md) for
 > spec status definitions.
 
-Built on [ZodiCore](../ZodiCore/SPEC.md) — ZodiXchange does not reimplement
-identity, tenancy, billing, notifications, RBAC, plugins, or audit logging;
-it consumes those services and adds exchange-domain modules on top.
+ZodiXchange is a standalone, self-hosted Laravel application built by
+cloning the sanitized [base codebase](../../architecture/base-codebase-strategy.md),
+running the
+[genericization checklist](../../architecture/product-genericization-checklist.md)
+to strip the base engine's banking-specific loan/DPS/FDR/branch tables, and
+layering exchange-domain modules on top. It does not depend on any other
+Zodize product or on a central "ZodiCore" platform for identity, billing,
+notifications, or tenancy — see
+[single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md).
+`ZodiCore` is itself just another standalone product in the catalog (a
+general-purpose back-office/ERP starter), not a platform ZodiXchange runs
+on.
 
 ## 1. Vision
 
@@ -26,10 +35,10 @@ defensible trading venue from day one.
 Standing up exchange infrastructure today typically means building a
 matching engine from scratch or licensing one in isolation from custody,
 surveillance, and liquidity-provider tooling. ZodiXchange exists to give an
-exchange operator a coherent venue platform — matching, custody
-integration, LP connectivity, and surveillance — built on ZodiCore's
-identity and audit backbone, so the operator's engineering effort goes into
-market design and liquidity, not plumbing.
+exchange operator a coherent, self-hosted venue platform — matching,
+custody integration, LP connectivity, and surveillance — built on a base
+codebase whose RBAC, KYC, and audit engine already work, so the operator's
+engineering effort goes into market design and liquidity, not plumbing.
 
 ## 3. Target Market
 
@@ -48,7 +57,7 @@ Capital markets, digital asset exchanges, derivatives markets.
 
 | Capability | Comparable to | Zodize differentiation |
 |---|---|---|
-| Matching engine infrastructure | Nasdaq Matching Engine (licensed), B2C2/DXtrade-class venue tech, Talos | Ships with tenant/RBAC/audit already built via ZodiCore, faster to stand up a compliant venue |
+| Matching engine infrastructure | Nasdaq Matching Engine (licensed), B2C2/DXtrade-class venue tech, Talos | Ships with RBAC/audit already built into the inherited base codebase, faster to stand up a compliant venue |
 | Digital asset exchange platform | Coinbase Prime infrastructure tier, ErisX/CoinFLEX-class venue tech | Custody integration and surveillance share one audit trail with matching, not bolted-on separately |
 | Market surveillance | Nasdaq SMARTS, Eventus Systems | Surveillance rules operate directly on the order/trade ledger of record, not a delayed downstream feed |
 | Liquidity provider connectivity | FIX-based prime brokerage gateways, LMAX Digital LP APIs | Standardized LP API contract shared across every Zodize capital-markets product |
@@ -66,7 +75,10 @@ Capital markets, digital asset exchanges, derivatives markets.
   book via the trading UI or API.
 - **Custody/Settlement Analyst** — manages wallet/custody reconciliation
   and settlement/clearing operations.
-- **Zodize Support/Ops** — as defined in [ZodiCore §6](../ZodiCore/SPEC.md#6-personas).
+- **Buyer's own IT/support staff** — the only support layer this deployment
+  has; there is no Zodize-operated support console, since each deployment is
+  the buyer's own standalone codebase (see
+  [admin-template.md](../../templates/admin-template.md)).
 
 ## 7. User Journeys
 
@@ -92,7 +104,7 @@ Capital markets, digital asset exchanges, derivatives markets.
    or venue-wide halt → Market Operations Manager initiates the halt → new
    order acceptance for the affected symbol(s) stops, resting orders are
    preserved not canceled → on resume, the order book reopens per the
-   tenant's configured reopening auction or continuous-resume policy.
+   deployment's configured reopening auction or continuous-resume policy.
 5. **Settlement and custody reconciliation**: filled trades enter
    settlement/clearing per the market's settlement model (custodial
    ledger movement or on-chain settlement) → Custody/Settlement Analyst
@@ -119,7 +131,7 @@ Capital markets, digital asset exchanges, derivatives markets.
   distribution to subscribed clients.
 - Order types: market, limit, stop, iceberg (hidden quantity), and
   post-only (maker-guaranteed) orders.
-- Maker/taker fee schedule: configurable per tenant, per symbol, and per
+- Maker/taker fee schedule: configurable per deployment, per symbol, and per
   volume tier, applied at trade settlement.
 - Custody/wallet integration: abstraction over custodial balance ledgers
   and/or on-chain wallet balances backing tradable assets.

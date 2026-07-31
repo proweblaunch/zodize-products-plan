@@ -94,9 +94,11 @@ exactly one of them — never duplicated across layers:
 - **Events/Listeners** — domain events fired on create/update/delete.
   `Log{Entity}AuditEvent` MUST be registered on every entity's lifecycle
   events per [`../security/audit-logging.md`](../security/audit-logging.md).
-- **Notifications** — outbound notifications, dispatched through ZodiCore's
-  notification system, never sent directly via a mail/SMS facade from a
-  Service.
+- **Notifications** — outbound notifications, dispatched through the
+  inherited base codebase's own notification system (`App\Notify\Notify`,
+  see
+  [`../standards/admin-configuration-baseline.md`](../standards/admin-configuration-baseline.md#notifications)),
+  never sent directly via a mail/SMS facade from a Service.
 - **database/migrations, factories, seeders** — schema and test/demo data
   for this module's own tables, layered on top of
   [database-template.md](./database-template.md).
@@ -115,16 +117,19 @@ exactly one of them — never duplicated across layers:
 version, dependencies on other modules, and calls out to
 `routes.permissions.php` to auto-register the module's permission set with
 RBAC on install, per [permission-template.md](./permission-template.md). A
-module MUST be independently enableable/disableable per tenant through this
-manifest, supporting the plugin architecture in
+module MUST be independently enableable/disableable within the deployment
+through this manifest, supporting the plugin architecture in
 [`../architecture/`](../architecture).
 
-## What ZodiCore provides vs. what a product customizes
+## What the base codebase provides vs. what a product customizes
 
-ZodiCore provides: the module auto-discovery/loading mechanism, the base
-Repository interface and abstract implementation, the audit-log listener
-base class, and the notification dispatch pipeline every module's
-Notifications layer calls into.
+The base codebase (see
+[`../architecture/base-codebase-strategy.md`](../architecture/base-codebase-strategy.md))
+provides: the module auto-discovery/loading mechanism, the base Repository
+interface and abstract implementation, the audit-log listener base class,
+and the notification dispatch pipeline every module's Notifications layer
+calls into — all running inside the product's own single codebase, with no
+runtime call to another Zodize product.
 
 A product customizes: every file under Models, Policies, Http, Services,
 Repositories, Events, Listeners, Notifications, database, routes, and

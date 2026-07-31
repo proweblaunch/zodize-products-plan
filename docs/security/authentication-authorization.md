@@ -1,9 +1,15 @@
 # Authentication & Authorization
 
-> Applies to every Zodize product via ZodiCore's identity module. Product specs
-> MUST NOT implement a parallel authentication system; they consume this one.
-> See [`../architecture/overview.md`](../architecture/overview.md) for how
-> ZodiCore's identity service relates to each vertical product.
+> Every Zodize product implements its own authentication and authorization
+> in its own codebase, inherited from the base codebase's existing engine —
+> the `web`/`admin`/`branch_staff` guards, password hashing, and session
+> handling already built into the base every product clones. There is no
+> shared identity service any product calls at runtime; each deployment is
+> fully self-contained. Product specs MUST NOT implement a parallel
+> authentication system; they build on this inherited one. See
+> [`../architecture/base-codebase-strategy.md`](../architecture/base-codebase-strategy.md)
+> and
+> [`../architecture/single-tenant-deployment-model.md`](../architecture/single-tenant-deployment-model.md).
 
 ## Password policy
 
@@ -71,19 +77,29 @@
 
 ## SSO / SAML / OAuth2
 
-- Every product MUST support OAuth2/OpenID Connect as an enterprise SSO
-  option (ZodiCore ships a generic OIDC connector configurable per tenant).
-- SAML 2.0 SP-initiated SSO MUST be available for enterprise-tier tenants on
-  every product; SP metadata is generated per tenant, IdP metadata is
-  uploaded by the tenant admin, and just-in-time (JIT) user provisioning MUST
-  map IdP group claims to Zodize roles per [`rbac-permissions.md`](./rbac-permissions.md).
-- When a tenant enforces SSO ("SSO required" setting), password-based login
-  for that tenant's users MUST be disabled at the application layer, not just
+- Every product MUST support OAuth2 "Sign in with Google" and "Sign in with
+  Facebook"/"Sign in with LinkedIn" as first-party social login options via
+  the base codebase's already-integrated `laravel/socialite` credentials
+  screen (see
+  [`../architecture/base-codebase-strategy.md`](../architecture/base-codebase-strategy.md)
+  and
+  [`admin-configuration-baseline.md`](../standards/admin-configuration-baseline.md#general-settings--branding)),
+  configured once by the buyer from the admin panel — excluded on
+  financial-grade products, which require password+MFA only, given
+  heightened identity-assurance requirements.
+- A product whose target market expects enterprise SSO (OAuth2/OpenID
+  Connect or SAML 2.0 SP-initiated) MAY add it as a scoped extension of the
+  inherited auth engine, documented in that product's own
+  [`SPEC.md`](../products/): SP metadata is generated once for the
+  deployment, IdP metadata is uploaded by the business's own Admin/Owner from
+  the admin panel, and just-in-time (JIT) user provisioning MUST map IdP
+  group claims to the product's own roles per
+  [`rbac-permissions.md`](./rbac-permissions.md). This is not inherited from
+  the base codebase by default and is built once per product that needs it,
+  not assumed to already exist.
+- When the business enables an "SSO required" setting, password-based login
+  for that deployment MUST be disabled at the application layer, not just
   hidden from the UI.
-- OAuth2 "Sign in with Google" and "Sign in with Microsoft" MUST be available
-  as first-party social login options for self-serve products (excluded on
-  financial-grade products, which require SSO or password+MFA only, given
-  heightened identity-assurance requirements).
 
 ## Passwordless / magic-link authentication
 
@@ -102,11 +118,13 @@
   registered in the service provider; controllers MUST call `$this->authorize()`
   or the `can` middleware before performing any read or write — no controller
   branches on `if ($user->role === 'admin')` directly.
-- Policies MUST check, in order: (1) tenant membership, (2) the actor's
-  effective permission for the resource/action pair per
-  [`rbac-permissions.md`](./rbac-permissions.md), (3) any resource-level
+- Policies MUST check, in order: (1) the actor's effective permission for
+  the resource/action pair per
+  [`rbac-permissions.md`](./rbac-permissions.md), (2) any resource-level
   ownership or scoping rule (e.g., a Manager can only edit invoices in their
-  own branch). Failing any check returns `403`, never a silent empty result.
+  own branch, on a product with multi-branch scoping — see
+  [`localization-i18n.md`](../standards/localization-i18n.md#multi-company--multi-branch-data-scoping)).
+  Failing any check returns `403`, never a silent empty result.
 - Gates are reserved for cross-cutting, non-model checks (e.g., "can access
   the billing settings area"); Policies are used for every Eloquent model.
 - Every authorization decision that denies access to a sensitive action MUST
@@ -134,4 +152,5 @@
 - [`rbac-permissions.md`](./rbac-permissions.md)
 - [`audit-logging.md`](./audit-logging.md)
 - [`security-standards.md`](./security-standards.md)
-- [`../architecture/multi-tenancy.md`](../architecture/multi-tenancy.md)
+- [`../architecture/base-codebase-strategy.md`](../architecture/base-codebase-strategy.md)
+- [`../architecture/single-tenant-deployment-model.md`](../architecture/single-tenant-deployment-model.md)

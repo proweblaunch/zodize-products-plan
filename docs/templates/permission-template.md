@@ -65,18 +65,20 @@ return [
 ];
 ```
 
-On module install (or first boot after a module is added to a product),
-ZodiCore's module loader MUST:
+On module install (or first boot after a module is added to a product), the
+inherited base codebase's module loader (see
+[`../architecture/base-codebase-strategy.md`](../architecture/base-codebase-strategy.md))
+MUST:
 
 1. Read every enabled module's `routes.permissions.php`.
 2. Upsert each declared permission into the `permissions` table (see
    [database-template.md](./database-template.md)), keyed by slug, so
    re-running install is idempotent.
 3. Attach newly-registered permissions to the `is_system` `Owner`/`Admin`
-   roles automatically for every existing tenant, so that an upgrade never
-   silently locks tenant admins out of new functionality.
+   roles automatically within the deployment, so that an update never
+   silently locks the buyer's own admin staff out of new functionality.
 4. Leave newly-registered permissions unattached to any non-system role by
-   default — a tenant's custom roles MUST opt in explicitly.
+   default — the buyer's own custom roles MUST opt in explicitly.
 5. Never delete a permission automatically when a module is disabled;
    disabling a module MUST retain the permission rows (for audit-log
    readability of historical grants) but MUST make the permission
@@ -88,11 +90,14 @@ MUST reference these slugs directly (e.g.
 from role name — role names are a UI/assignment concept, permissions are the
 authorization primitive.
 
-## What ZodiCore provides vs. what a product customizes
+## What the base codebase provides vs. what a product customizes
 
-ZodiCore provides: the `permissions`, `roles`, `role_user`, and
-`permission_role` tables, the module loader's permission-sync step, the
-system-role auto-attach behavior, and the admin permission-management UI.
+The base codebase (see
+[`../architecture/base-codebase-strategy.md`](../architecture/base-codebase-strategy.md))
+provides: the `permissions`, `roles`, `role_user`, and `permission_role`
+tables, the module loader's permission-sync step, the system-role
+auto-attach behavior, and the admin permission-management UI — all running
+inside the product's own codebase against its own database.
 
 A product customizes: the contents of each module's
 `routes.permissions.php` — its resource list and module-specific action

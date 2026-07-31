@@ -33,7 +33,7 @@ database/seeders/
   misclassified and belongs in Feature tests instead.
 - Unit tests MUST cover: the success path, and every distinct branch in the
   method's business logic (e.g. an `if` that changes behavior based on
-  tenant plan MUST have a test per branch).
+  subscription/plan tier MUST have a test per branch).
 - Unit tests MUST NOT assert on HTTP status codes or response JSON shape —
   that belongs to Feature tests.
 
@@ -47,10 +47,16 @@ minimum, the following cases — this is a mandatory floor, not a menu:
    [api-template.md](./api-template.md).
 2. **Key edge cases** — specific to the endpoint, e.g. pagination boundary
    (empty result set, last page), duplicate-creation conflict, referencing a
-   soft-deleted related record, tenant-scoping (a user from Tenant A MUST
-   NOT be able to read/modify Tenant B's resource, and the test MUST assert
-   a `404`, not a `403`, to avoid confirming the resource's existence to an
-   unauthorized tenant).
+   soft-deleted related record, and, where the product supports
+   multi-company/multi-branch scoping per
+   [`../standards/localization-i18n.md`](../standards/localization-i18n.md#multi-company--multi-branch-data-scoping),
+   branch-scoping (a user assigned to Branch A MUST NOT be able to read/
+   modify Branch B's resource without cross-branch permission, and the test
+   MUST assert a `404`, not a `403`, to avoid confirming the resource's
+   existence to an unauthorized user). There is no cross-tenant isolation
+   test category — every deployment already belongs to exactly one business,
+   per
+   [`../architecture/single-tenant-deployment-model.md`](../architecture/single-tenant-deployment-model.md#what-single-tenant-changes-in-the-data-model).
 3. **Authorization denial case — mandatory** — a request from an
    authenticated user who lacks the required permission (see
    [permission-template.md](./permission-template.md)) MUST be tested and
@@ -87,9 +93,12 @@ minimum, the following cases — this is a mandatory floor, not a menu:
   than every test manually overriding fields to reach that state.
 - A module's Seeder MUST populate enough realistic demo data to make the
   module's UI meaningfully explorable in a local/staging environment
-  (referenced by [deployment-template.md](./deployment-template.md) for
-  non-production environments); Seeders MUST NOT run automatically against
-  production.
+  (referenced by
+  [deployment-template.md](./deployment-template.md#zodizes-own-environment-tiers-pre-release-only)
+  for Zodize's own pre-release environments) and, per the Demo Standard in
+  [`../../README.md`](../../README.md), to give a fresh buyer install a
+  populated demo instance out of the box; Seeders MUST NOT run automatically
+  against a buyer's live instance once it holds real business data.
 
 ## Scaffold checklist per module
 
@@ -103,11 +112,14 @@ minimum, the following cases — this is a mandatory floor, not a menu:
       [`../quality/ci-cd-standards.md`](../quality/ci-cd-standards.md)
       before merge.
 
-## What ZodiCore provides vs. what a product customizes
+## What the base codebase provides vs. what a product customizes
 
-ZodiCore provides: the base `TestCase` class with tenant/auth test helpers,
-the Browser test driver configuration, and shared Factory traits (e.g.
-tenant-scoping helpers).
+The base codebase (see
+[`../architecture/base-codebase-strategy.md`](../architecture/base-codebase-strategy.md))
+provides: the base `TestCase` class with auth test helpers, the Browser test
+driver configuration, and shared Factory traits (e.g. company/branch-scoping
+helpers for products that use that scoping layer) — all running inside the
+product's own codebase and test suite.
 
 A product customizes: every test file and Factory/Seeder listed above for
 its own modules. A product MUST NOT reduce the mandatory case list above to

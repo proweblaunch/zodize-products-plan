@@ -12,10 +12,12 @@ ZodiBuild is the system of record for a construction general contractor or
 owner's-rep firm running projects from preconstruction budget through
 closeout — phases and budget-vs-actuals, subcontractor management, the
 RFI/submittal exchange, daily site logs, change orders, punch lists, safety
-incidents, and drawing/spec version control — built on the same ZodiCore
-foundation ([SPEC.md](../ZodiCore/SPEC.md)) every Zodize product shares, so
-a construction firm gets enterprise identity, multi-project tenancy, and
-billing without a separate construction-tech vendor stack.
+incidents, and drawing/spec version control — built as a standalone,
+self-hosted Laravel application from the shared Zodize base codebase
+([base-codebase-strategy.md](../../architecture/base-codebase-strategy.md)),
+so a construction firm gets a working admin back office, RBAC, and
+multi-project data scoping without a separate construction-tech vendor
+stack.
 
 ## 2. Purpose
 
@@ -46,7 +48,7 @@ industrial/heavy civil, and multi-family/residential development.
 | Construction project management | Procore | Modern UI, transparent pricing, no enterprise-only feature gating |
 | Field-first project management | Buildertrend | Scales to multi-project commercial GC operations, not residential-remodel-first |
 | RFI/submittal workflow | PlanGrid (Autodesk Build) | Unified with budget/change-order tracking, not a documents-only tool |
-| Document control | Newforma | Enterprise RBAC, audit trail, and multi-project tenancy inherited from ZodiCore from day one |
+| Document control | Newforma | Enterprise RBAC, audit trail, and multi-project data scoping inherited from the base engine from day one |
 | Safety/incident tracking | SafetyCulture (iAuditor) | Native to the same project record as RFIs and daily logs, not a bolt-on inspection app |
 
 ## 6. Personas
@@ -170,20 +172,39 @@ rendering rather than full-file download before view.
 
 ## 11. Architecture
 
-ZodiBuild is a tenant application on ZodiCore
-([architecture/overview.md](../../architecture/overview.md)), consuming
-`zodize/core-identity`, `zodize/core-billing`, `zodize/core-notifications`,
-`zodize/core-permissions`, and `zodize/core-plugins` as Composer packages.
-Projects are modeled as first-class entities under a GC's tenant, with
-subcontractor companies granted scoped external-collaborator access via
-ZodiCore's permission model (per
-[rbac-permissions.md](../../security/rbac-permissions.md)) rather than
-full tenant membership, since subcontractors need visibility into only
-their own project's RFIs/submittals/punch items, never the GC's full
-portfolio. Document control (drawings/specs) uses tenant-scoped document
-storage with a version-chain data model (each version supersedes the
-prior, never overwritten), and large-file rendering is offloaded to an
-asynchronous tiling/preview generation job per
+ZodiBuild is a standalone, self-hosted Laravel application, sold as source
+code to one general contractor or owner's-rep firm and deployed entirely
+within that buyer's own hosting account — there is no shared platform
+service and no other Zodize product it depends on at runtime
+([single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md)).
+It is built by cloning the sanitized base codebase and running the
+[genericization checklist](../../architecture/product-genericization-checklist.md):
+the banking-specific tables (`loans`, `dps`, `fdr`, `branches`/
+`branch_staff`, `other_banks`, `beneficiaries`, `airtime_operators`) are
+stripped, and ZodiBuild's own domain modules — project management, budget &
+cost, subcontractor management, RFIs & submittals, daily site logs, change
+orders, punch lists, safety, document control — are built on top of the
+inherited engine's wallet/ledger, payment gateways, RBAC/auth, KYC, i18n,
+and admin configuration surface (see
+[base-codebase-strategy.md](../../architecture/base-codebase-strategy.md)
+and
+[admin-configuration-baseline.md](../../standards/admin-configuration-baseline.md)).
+
+Projects are modeled as first-class entities within the one buyer's
+deployment. Subcontractor firms are granted scoped external-collaborator
+`web`-guard accounts through the inherited RBAC model (per
+[rbac-permissions.md](../../security/rbac-permissions.md)) rather than any
+form of separate tenancy — since every subcontractor account still belongs
+to the same one deployment the GC owns, a subcontractor's restricted
+visibility (their own project's RFIs/submittals/punch items only, never the
+GC's full portfolio or another subcontractor's records) is enforced by
+ordinary row-level authorization (policy checks scoped to
+`project_subcontractors` membership), not tenant isolation — there is no
+`tenant_id` anywhere in ZodiBuild's schema. Document control (drawings/
+specs) uses project-scoped document storage with a version-chain data
+model (each version supersedes the prior, never overwritten), and
+large-file rendering is offloaded to an asynchronous tiling/preview
+generation job per
 [caching-queues-events.md](../../architecture/caching-queues-events.md).
 
 ## 12. Technology

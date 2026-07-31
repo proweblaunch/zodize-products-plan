@@ -8,10 +8,10 @@
 ## 1. Vision
 
 ZodiBusiness is the small-and-midsize-business operating system: CRM,
-inventory, quoting, invoicing, and core accounting in one tenant application,
-so an SMB owner runs their whole operation without stitching together a CRM
-tool, a spreadsheet-based inventory count, and a separate accounting package
-that never quite reconciles with each other.
+inventory, quoting, invoicing, and core accounting in one self-hosted
+application, so an SMB owner runs their whole operation without stitching
+together a CRM tool, a spreadsheet-based inventory count, and a separate
+accounting package that never quite reconciles with each other.
 
 ## 2. Purpose
 
@@ -129,7 +129,7 @@ Inherits the baseline in
 ZodiBusiness-specific additions:
 
 - Financial reports (trial balance, P&L) must generate for a 12-month range
-  in under 5 seconds for a tenant with up to 500,000 journal lines.
+  in under 5 seconds for a deployment with up to 500,000 journal lines.
 - Ledger posting is transactionally atomic — a payment that touches both
   accounts receivable and cash must never leave the books unbalanced, even
   under partial failure.

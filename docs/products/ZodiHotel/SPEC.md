@@ -10,11 +10,12 @@
 
 ZodiHotel is the property management system (PMS) that runs a hotel's entire
 guest and revenue lifecycle — from the moment a room is priced and listed on
-an OTA to the night audit that closes the day's books — on the same
-ZodiCore foundation ([SPEC.md](../ZodiCore/SPEC.md)) every Zodize product
-shares, so a hotel group running ZodiHotel already has enterprise identity,
-multi-property tenancy, and billing solved before their first room type is
-configured.
+an OTA to the night audit that closes the day's books — as a standalone,
+self-hosted Laravel application built from the shared Zodize base codebase
+([base-codebase-strategy.md](../../architecture/base-codebase-strategy.md)),
+so a hotel group deploying ZodiHotel to their own hosting already has a
+working admin back office, wallet/ledger, payment gateways, RBAC, and
+multi-property scoping solved before their first room type is configured.
 
 ## 2. Purpose
 
@@ -44,7 +45,7 @@ extended-stay properties, and small conference hotels.
 |---|---|---|
 | Full-service PMS | Oracle OPERA Cloud | Modern UI, transparent per-room pricing, no multi-year enterprise contract required |
 | Cloud-native PMS | Cloudbeds, Mews | Deeper channel-manager control and folio/billing sophistication out of the box |
-| Boutique/independent focus | little hotelier, Clock PMS | Enterprise RBAC, audit trail, and multi-property tenancy from day one, not bolted on |
+| Boutique/independent focus | little hotelier, Clock PMS | Enterprise RBAC, audit trail, and multi-property scoping from day one, not bolted on |
 | Channel management | SiteMinder, RateGain | Native two-way channel sync as a first-class ZodiHotel module, not a third-party add-on fee |
 | Group/event sales | Tripleseat (event side only) | Unified PMS + group booking + folio in one system instead of a separate event tool |
 
@@ -165,16 +166,36 @@ same room type.
 
 ## 11. Architecture
 
-ZodiHotel is a tenant application on ZodiCore
-([architecture/overview.md](../../architecture/overview.md)), consuming
-`zodize/core-identity`, `zodize/core-billing`, `zodize/core-notifications`,
-`zodize/core-permissions`, and `zodize/core-plugins` as Composer packages.
-Each hotel property is modeled as a ZodiCore `branch` under a tenant
-`company` (per
-[multi-tenancy.md](../../architecture/multi-tenancy.md)), so a hotel group
-manages many properties under one tenant with property-scoped data
-isolation and group-level roll-up reporting. Channel manager connections are
-implemented as outbound integration adapters behind a
+ZodiHotel is a standalone, self-hosted Laravel application, sold as source
+code to one hotel or hotel group and deployed entirely within that buyer's
+own hosting account — there is no shared platform service and no other
+Zodize product it depends on at runtime
+([single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md)).
+It is built by cloning the sanitized base codebase and running the
+[genericization checklist](../../architecture/product-genericization-checklist.md):
+the banking-specific tables (`loans`, `dps`, `fdr`, `other_banks`,
+`beneficiaries`, `airtime_operators`) are stripped, and ZodiHotel's own
+domain modules — inventory & rates, reservations, channel management, front
+desk, housekeeping, folio & billing, groups & events, night audit — are
+built on top of the inherited engine's wallet/ledger, payment gateways,
+RBAC/auth, KYC, i18n, and admin configuration surface (see
+[base-codebase-strategy.md](../../architecture/base-codebase-strategy.md)
+and
+[admin-configuration-baseline.md](../../standards/admin-configuration-baseline.md)).
+
+A hotel group running more than one property re-purposes the base's
+branch-scoped staff guard rather than the base's banking `BranchStaff` code:
+per
+[product-genericization-checklist.md §4](../../architecture/product-genericization-checklist.md#step-4--confirm-guard-configuration-matches-the-products-needs),
+ZodiHotel re-adds a `branch_staff`-equivalent guard scoped to a property, so
+front-desk and housekeeping staff at one property can be restricted to that
+property's data while a General Manager or ownership-group role sees across
+all properties in the one deployment. Properties are modeled as `branches`
+under an optional `company` scoping layer per
+[localization-i18n.md](../../standards/localization-i18n.md#multi-company--multi-branch-data-scoping)
+— this is data scoping within one buyer's one deployment, not multi-tenancy;
+there is no `tenant_id` anywhere in ZodiHotel's schema. Channel manager
+connections are implemented as outbound integration adapters behind a
 `ChannelConnectorContract`, decoupling ZodiHotel's inventory engine from any
 single OTA's API shape; each connector normalizes inbound reservations and
 outbound availability/rate pushes to ZodiHotel's canonical rate-plan model.
@@ -206,19 +227,26 @@ scheduled jobs for night audit and group-block auto-release, per
 
 ## 14. Core Data Model
 
+All tables belong to the one buyer's one deployment — there is no
+`tenant_id` column anywhere in this model
+([single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md)).
+A hotel group operating several locations scopes them via `company_id` /
+`branch_id`, following
+[localization-i18n.md](../../standards/localization-i18n.md#multi-company--multi-branch-data-scoping).
+
 | Entity | Key columns | Notes |
 |---|---|---|
-| `properties` | id, tenant_id, branch_id, name, timezone, currency | Maps to a ZodiCore `branch`; one property per hotel location |
+| `properties` | id, company_id, branch_id, name, timezone, currency | One property per hotel location; `branch_id` drives the property-scoped staff guard |
 | `room_types` | id, property_id, name, base_occupancy, max_occupancy | e.g. Standard King, Suite |
 | `rooms` | id, room_type_id, room_number, floor, status | Physical/bookable room; status FK to housekeeping status |
 | `rate_plans` | id, property_id, room_type_id, name, cancellation_policy_id, channel_scope | BAR, corporate, package, OTA-specific |
 | `rate_calendar_entries` | id, rate_plan_id, date, rate_amount, min_stay, stop_sell | Daily rate/restriction grid |
 | `reservations` | id, property_id, guest_id, room_type_id, rate_plan_id, check_in, check_out, status, source_channel | Core booking record |
 | `reservation_rooms` | id, reservation_id, room_id, assigned_at | Supports room moves/multi-room reservations |
-| `guests` | id, tenant_id, name, contact_info, id_document_ref, loyalty_id | Guest profile, reused across properties in a group |
+| `guests` | id, name, contact_info, id_document_ref, loyalty_id | Guest profile, reused across every property in the deployment |
 | `folios` | id, reservation_id, window_number, billing_type, status | Split-billing windows on a reservation |
 | `folio_charges` | id, folio_id, charge_code, amount, tax_amount, posted_at, posted_by | Itemized line items |
-| `payments` | id, folio_id, method, amount, gateway_reference | Via ZodiCore payment gateway abstraction (§20 of ZodiCore SPEC) |
+| `payments` | id, folio_id, method, amount, gateway_reference | Via the inherited payment gateway engine, see [payment-gateways.md](../../standards/payment-gateways.md); each payment also produces a `Transaction` per [wallet-system.md](../../standards/wallet-system.md) |
 | `housekeeping_tasks` | id, room_id, assigned_to, status, started_at, completed_at, inspected_by | Turnover tracking |
 | `group_blocks` | id, property_id, name, room_count, cutoff_date, release_rule | Group inventory hold |
 | `banquet_event_orders` | id, group_block_id, event_date, room_setup, charges_summary | Catering/AV linkage to group folio |
@@ -279,9 +307,9 @@ All channels follow
 
 ## 18. Permissions & Roles
 
-Inherits ZodiCore default roles
-([rbac-permissions.md](../../security/rbac-permissions.md#default-system-roles))
-scoped per property/branch. ZodiHotel-specific permissions: `reservations.manage`,
+Inherits the base codebase's default admin roles
+([rbac-permissions.md](../../security/rbac-permissions.md#default-system-roles)),
+scoped per property via the `branch_staff`-equivalent guard. ZodiHotel-specific permissions: `reservations.manage`,
 `reservations.checkin`, `folios.manage`, `folios.void_charge` (elevated —
 requires Manager+), `rates.manage`, `channels.manage`,
 `housekeeping.manage`, `groups.manage`, `night_audit.run`,
@@ -305,8 +333,8 @@ role by default cannot void charges or reopen a closed business date.
 ## 20. Audit Logs
 
 Every folio charge, payment, void, rate override, room assignment change,
-and business-date rollover is recorded to the ZodiCore audit log with actor,
-timestamp, before/after values, and property scope — per
+and business-date rollover is recorded to the deployment's audit log with
+actor, timestamp, before/after values, and property scope — per
 [audit-logging.md](../../security/audit-logging.md). Folio and reservation
 records additionally carry a per-record activity timeline visible to Manager+
 roles.
@@ -327,9 +355,9 @@ Multi-property groups get a group roll-up dashboard.
 - **OTA channel managers**: Booking.com, Expedia, Airbnb, and aggregator
   channel-manager platforms (SiteMinder, RateGain) via the
   `ChannelConnectorContract`.
-- **Payment gateways**: via ZodiCore's payment gateway abstraction (§20 of
-  [ZodiCore SPEC.md](../ZodiCore/SPEC.md#20-payment-gateways-wallet-accounting-taxes-invoices)),
-  including terminal/card-present integration for front desk.
+- **Payment gateways**: via the inherited payment gateway engine
+  ([payment-gateways.md](../../standards/payment-gateways.md)), including
+  terminal/card-present integration for front desk.
 - **Booking engine widget**: embeddable direct-booking widget for property
   websites.
 - **Point of sale**: optional integration with [ZodiPOS](../ZodiPOS/SPEC.md)

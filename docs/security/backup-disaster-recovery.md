@@ -39,13 +39,15 @@ above.
 - Every backup MUST be encrypted at rest using the same key management
   service as production data (SSE-KMS or equivalent), never stored
   unencrypted "for restore simplicity."
-- Backups MUST be stored in a region distinct from the primary production
-  region, subject to the same data-residency jurisdiction constraints
+- Backups MUST be stored in a location distinct from the primary hosting
+  account (a separate storage bucket/server, not merely a separate directory
+  on the same host), subject to the same data-residency constraints
   described in
-  [`data-protection-privacy.md`](./data-protection-privacy.md#data-residency-and-multi-region) —
-  cross-region within the same legal jurisdiction family (e.g. a US-East
-  primary backing up to US-West, an EU primary backing up to a second EU
-  region), never cross-jurisdiction without explicit tenant consent.
+  [`data-protection-privacy.md`](./data-protection-privacy.md#data-residency) —
+  cross-region within the same legal jurisdiction family as the buyer's
+  chosen hosting region (e.g. a US-East primary backing up to US-West, an EU
+  primary backing up to a second EU region), never cross-jurisdiction without
+  the buyer's explicit consent.
 - Backup storage MUST use write-once/immutable retention (object lock or
   equivalent) for at least the minimum retention period of each tier above,
   so that a compromised production credential cannot also delete the
@@ -69,10 +71,11 @@ product's operational documentation, covering at minimum:
    standby, or restore from the most recent backup meeting the RPO target,
    including the specific commands/console actions and the queue-draining
    and cache-warming steps needed before traffic is restored.
-4. **Communication plan**: who notifies affected tenants, on what channel,
-   within what time window (target: initial notice within 1 hour of
-   declaration for financial-grade products, 4 hours for standard products),
-   referencing the product's status-page process.
+4. **Communication plan**: who notifies the buyer's own staff and, where the
+   product's own end customers are directly affected, those end customers,
+   on what channel, within what time window (target: initial notice within
+   1 hour of declaration for financial-grade products, 4 hours for standard
+   products), referencing the product's status-page process.
 5. **Post-incident review**: a mandatory retrospective within 5 business
    days of any DR invocation, documenting root cause, timeline, and any
    runbook corrections, filed as an entry the product's incident log.
