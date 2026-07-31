@@ -8,6 +8,30 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added — build execution tracking and process gates
+
+- Added `docs/architecture/deployment-paths.md`: documents the
+  `/home/script/public_html/<product-slug>/` build working-directory
+  convention, distinct from a buyer's own sale-time deployment.
+- Added `BUILD_STATE.md`: the root-level resumability ledger tracking every
+  product's build status, with the session-continuity protocol (verify
+  on-disk state before trusting the ledger, commit small, never re-run
+  destructive setup on in-progress work, stop and flag rather than guess).
+- Marked `ZodiTrack` as `Live — Extend Only` in `PRODUCT_CATALOG.md` (new
+  status definition) — it already exists as a complete, working, resold
+  product and is removed from `ROADMAP.md`'s build-from-scratch queue
+  entirely. Documented the audit-only, additive-extension-only workflow for
+  any product in this status.
+- Fixed the "Spec Complete" gate in
+  `docs/checklists/production-readiness-checklist.md`: it no longer
+  requires full ER diagrams/exhaustive endpoint catalogs before
+  implementation begins (only ZodiCore had these). That depth is now a
+  **GA gate** requirement, written just-in-time per module as it's
+  implemented. Updated `ROADMAP.md` Phase 4 and its Non-goals section to
+  match, and to state plainly that this repository, while still
+  documentation-only, is the authoritative blueprint Claude Code executes
+  against when building each product's real codebase.
+
 ### Changed — architecture correction: standalone self-hosted products, not multi-tenant SaaS
 
 - Corrected the handbook's foundational architecture assumption. Every
