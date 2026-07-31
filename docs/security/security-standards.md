@@ -26,10 +26,10 @@ is declared production-ready (see
 
 | OWASP Top 10 (2021) | Required mitigation on this stack |
 |---|---|
-| A01 Broken Access Control | Every controller action MUST be gated by a Laravel Policy or Gate (see [`authentication-authorization.md`](./authentication-authorization.md)). No route may rely on hiding a UI element as its only control. All tenant-scoped queries MUST pass through the global tenant scope described in [`../architecture/multi-tenancy.md`](../architecture/multi-tenancy.md). |
+| A01 Broken Access Control | Every controller action MUST be gated by a Laravel Policy or Gate (see [`authentication-authorization.md`](./authentication-authorization.md)). No route may rely on hiding a UI element as its only control. On a product with multi-company/multi-branch scoping, every scoped query MUST pass through the global company/branch scope described in [`../standards/localization-i18n.md`](../standards/localization-i18n.md#multi-company--multi-branch-data-scoping). |
 | A02 Cryptographic Failures | TLS 1.2+ in transit (TLS 1.3 preferred), AES-256 at rest for any column classified `confidential` or `restricted` under [`data-protection-privacy.md`](./data-protection-privacy.md). No custom cryptography — use Laravel's `encrypter` (AES-256-CBC/GCM via `APP_KEY`) or the framework's `Hash` facade (bcrypt/argon2id) exclusively. |
 | A03 Injection | All database access MUST go through Eloquent or the query builder with bound parameters. Raw SQL (`DB::raw`, `whereRaw`) requires a code comment justifying why the builder cannot express the query and MUST NOT interpolate user input. Blade/Vue templates MUST rely on default output escaping; `{!! !!}` and `v-html` require a documented sanitization step. |
-| A04 Insecure Design | New modules MUST document their threat model (who can act on what, in what tenant scope) in the product SPEC before implementation, per [`../development/`](../development/) design standards. |
+| A04 Insecure Design | New modules MUST document their threat model (who can act on what, in what role/scope) in the product SPEC before implementation, per [`../development/`](../development/) design standards. |
 | A05 Security Misconfiguration | `APP_DEBUG=false` and `APP_ENV=production` MUST be enforced in production config, verified by a CI check that fails the build if either is violated in a deploy artifact. Default framework error pages MUST NOT leak stack traces to end users. |
 | A06 Vulnerable and Outdated Components | Composer and NPM dependency audits are mandatory CI gates (see below). |
 | A07 Identification and Authentication Failures | See [`authentication-authorization.md`](./authentication-authorization.md) for password policy, MFA, and session standards. |
@@ -95,8 +95,9 @@ these gates sit in the pipeline.
   suites that do not provide forward secrecy.
 - HSTS MUST be enabled with `max-age=31536000; includeSubDomains; preload` on
   every product domain.
-- Internal service-to-service traffic (API to queue workers, API to
-  ZodiCore) MUST also be encrypted in transit; plaintext internal HTTP is not
+- Internal service-to-service traffic (the application to its queue workers,
+  cache, and any third-party API it calls, e.g. a payment gateway or SMS
+  provider) MUST also be encrypted in transit; plaintext internal HTTP is not
   permitted even inside a private network.
 
 ## Rate limiting

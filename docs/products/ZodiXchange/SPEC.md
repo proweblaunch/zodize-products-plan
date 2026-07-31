@@ -302,7 +302,7 @@ conform to [api-standards.md](../../development/api-standards.md) and
 
 ## 16. Events
 
-Domain events registered on ZodiCore's event bus (see
+Domain events registered on the inherited event bus (see
 [caching-queues-events.md](../../architecture/caching-queues-events.md)):
 `order.accepted`, `order.rejected`, `order.matched`, `order.canceled`,
 `market.halted`, `market.resumed`, `market.opened`, `market.closed`,
@@ -329,8 +329,11 @@ All channels follow
 
 ## 18. Permissions & Roles
 
-Extends [ZodiCore's default roles](../../security/rbac-permissions.md#default-system-roles)
-with exchange-specific roles: `Market Operations Manager`,
+Built on the inherited `Role`/`Permission` engine per
+[admin-template.md](../../templates/admin-template.md), with
+exchange-specific roles registered on top of the
+[default system roles](../../security/rbac-permissions.md#default-system-roles):
+`Market Operations Manager`,
 `Compliance/Market Surveillance Officer`, `Liquidity Provider`,
 `Custody/Settlement Analyst`, `Trader`. Key permissions: `markets.configure`,
 `markets.halt`, `markets.resume`, `orders.submit`, `orders.cancel_any`
@@ -362,7 +365,7 @@ with exchange-specific roles: `Market Operations Manager`,
 
 Every order acceptance/rejection, match, halt/resume, LP onboarding
 decision, fee schedule change, settlement status change, and surveillance
-disposition writes an immutable audit entry via ZodiCore's audit log
+disposition writes an immutable audit entry via the inherited audit log
 ([audit-logging.md](../../security/audit-logging.md)), capturing actor
 (including "system" for automated circuit breakers), timestamp, and
 before/after state. Order book snapshots are retained at a
@@ -390,22 +393,22 @@ market state at any point in time.
 - **On-chain settlement**: blockchain node/wallet infrastructure
   integration for venues settling on-chain, abstracted so the settlement
   module is chain-agnostic where feasible.
-- **Market data distribution**: outbound feed integration for tenants that
-  redistribute their own market data to third parties (consolidated tape-
-  style distribution).
-- **KYC/AML providers**: same identity-verification integration category
-  as [ZodiBank §22](../ZodiBank/SPEC.md#22-integrations) for account and LP
-  onboarding.
+- **Market data distribution**: outbound feed integration for operators
+  that redistribute their own market data to third parties (consolidated
+  tape-style distribution).
+- **KYC/AML providers**: uses the inherited base engine's KYC form-builder
+  and review flow (see
+  [admin-configuration-baseline.md](../../standards/admin-configuration-baseline.md#kyc))
+  for account and LP onboarding.
 - **Clearing houses**: optional integration for venues that clear through
   a third-party central counterparty rather than settling bilaterally.
 
 ## 23. AI Features
 
 - Market surveillance pattern detection: the rule-based surveillance engine
-  in §9 is augmented with anomaly-scoring that layers on top of ZodiCore's
-  audit-log anomaly detection ([ZodiCore §23](../ZodiCore/SPEC.md#23-ai-features)),
-  surfacing lower-confidence patterns for human review rather than
-  auto-dispositioning.
+  in §9 is augmented with anomaly-scoring that layers on top of the
+  inherited audit log's anomaly detection, surfacing lower-confidence
+  patterns for human review rather than auto-dispositioning.
 - LP quote quality scoring: summarizes an LP's quoting behavior (spread
   tightness, uptime, fill quality) to help Market Operations manage rebate
   tiers.
@@ -421,12 +424,11 @@ market state at any point in time.
 - CLI commands (Artisan): `xchange:reconcile-custody`,
   `xchange:archive-order-books`, `xchange:calculate-rebates`,
   `xchange:rescan-surveillance` — each requires the same authorization
-  context as its API equivalent, per
-  [ZodiCore §24](../ZodiCore/SPEC.md#24-automation-scheduled-jobs-cron-jobs-cli-commands).
+  context as its API equivalent.
 
 ## 25. Seed/Demo Data
 
-`XchangeDemoSeeder` provisions a demo tenant with several configured
+`XchangeDemoSeeder` provisions the demo deployment with several configured
 markets (spot and a simple derivatives symbol), a populated order book with
 resting synthetic liquidity, 12 months of trade tape history, onboarded
 demo liquidity providers with rebate history, and open/resolved
@@ -452,9 +454,9 @@ applies, plus:
   in plaintext.
 - **SOC2-equivalent controls**: change management, access review, and
   vendor risk management apply to the matching engine, custody integration,
-  and surveillance modules with the same rigor as the ZodiCore platform
-  baseline, including change control specifically for matching-engine
-  logic given its market-integrity sensitivity.
+  and surveillance modules with the same rigor as the inherited base
+  engine, including change control specifically for matching-engine logic
+  given its market-integrity sensitivity.
 - **KYC/AML** required before an account can submit its first order, with
   enhanced due diligence for liquidity provider onboarding given the
   larger capital and market-access footprint.
@@ -462,7 +464,7 @@ applies, plus:
   audit entries are append-only, matching §20.
 - **MFA is mandatory, not optional**, for every human user role submitting
   orders, managing markets, or dispositioning surveillance cases, enforced
-  at the tenant policy level per
+  at the deployment's security policy level per
   [authentication-authorization.md](../../security/authentication-authorization.md).
 - Custody balance segregation (customer assets never commingled with
   operator assets) is enforced at the data-model level in
@@ -536,10 +538,14 @@ obligations before go-live.
 
 ## Roadmap (spec depth)
 
+This spec's Architecture and Core Data Model sections were revised to
+reflect the corrected standalone, self-hosted, single-tenant deployment
+model — see
+[single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md)
+and [base-codebase-strategy.md](../../architecture/base-codebase-strategy.md).
 This spec is Foundation-depth. Queued for Deep-depth expansion: a full ER
 diagram and migration set for the order book/trade/settlement schema
 (companion `DATA_MODEL.md`), a complete endpoint catalog including the LP/
-FIX-style gateway (companion `API_REFERENCE.md`) matching
-[ZodiCore's structure](../ZodiCore/SPEC.md), and a full surveillance rule
-catalog beyond the initial spoofing/layering/wash-trading/quote-stuffing
-set. Changes follow [CONTRIBUTING.md](../../../CONTRIBUTING.md).
+FIX-style gateway (companion `API_REFERENCE.md`), and a full surveillance
+rule catalog beyond the initial spoofing/layering/wash-trading/
+quote-stuffing set. Changes follow [CONTRIBUTING.md](../../../CONTRIBUTING.md).

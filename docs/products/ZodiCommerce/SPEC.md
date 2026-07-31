@@ -189,14 +189,19 @@ this is scoping within one deployment, not tenancy.
 
 ## 12. Technology
 
-Laravel (PHP) + Vue per
-[coding-standards-php-laravel.md](../../development/coding-standards-php-laravel.md)
-and [coding-standards-vue.md](../../development/coding-standards-vue.md);
-PostgreSQL + Redis per
+Laravel (PHP) per the base codebase's stack (Laravel 11, PHP ^8.3, Vite 5) —
+see
+[base-codebase-strategy.md](../../architecture/base-codebase-strategy.md) —
+following
+[coding-standards-php-laravel.md](../../development/coding-standards-php-laravel.md);
+MySQL/MariaDB + Redis (where the buyer's hosting supports it, with a file/DB
+cache fallback) per
 [database-standards.md](../../development/database-standards.md); a
-dedicated storefront caching/CDN layer for catalog pages; a queue-driven
-integration layer for marketplace and shipping-carrier connectors so
-third-party latency never blocks the checkout critical path.
+storefront-page caching layer for catalog pages within the buyer's own
+hosting (no assumed external CDN); a queue-driven integration layer for
+marketplace and shipping-carrier connectors so third-party latency never
+blocks the checkout critical path, per
+[caching-queues-events.md](../../architecture/caching-queues-events.md).
 
 ## 13. Modules & Submodules
 

@@ -18,9 +18,13 @@
 - [ ] Every new or changed controller action is gated by a Policy/Gate check
       per [`../security/authentication-authorization.md`](../security/authentication-authorization.md#authorization-policy-based-pattern) —
       no bare route added without an authorization check.
-- [ ] Every new tenant-owned Eloquent model uses the tenant global scope per
-      [`../architecture/multi-tenancy.md`](../architecture/multi-tenancy.md#global-query-scopes-for-tenant-isolation)
-      and ships a cross-tenant isolation test (see Tests below).
+- [ ] Every new Eloquent model belonging to a product with multi-company/
+      multi-branch scoping uses the company/branch global scope per
+      [`../standards/localization-i18n.md`](../standards/localization-i18n.md#multi-company--multi-branch-data-scoping)
+      and ships a cross-branch isolation test (see Tests below). Products
+      without multi-company/multi-branch scope have no such requirement —
+      see
+      [`../architecture/single-tenant-deployment-model.md`](../architecture/single-tenant-deployment-model.md).
 - [ ] Any new sensitive action (auth event, permission change, data export,
       destructive action, financial transaction) is wired into the audit log
       per [`../security/audit-logging.md`](../security/audit-logging.md#what-must-be-audited).
@@ -29,9 +33,10 @@
 
 - [ ] Unit and feature tests cover the change, including the failure/edge
       paths, not only the happy path.
-- [ ] If the change touches a tenant-owned resource, a cross-tenant
+- [ ] If the change touches a resource scoped to a company/branch on a
+      product with multi-company/multi-branch operation, a cross-branch
       isolation test exists per
-      [`../architecture/multi-tenancy.md`](../architecture/multi-tenancy.md#cross-tenant-data-leakage-prevention).
+      [`../development/testing-standards.md`](../development/testing-standards.md#non-negotiable-test-cases).
 - [ ] All existing tests pass locally and in CI; no test was skipped or
       commented out to get the PR green.
 - [ ] New API endpoints have a feature test asserting the exact response
@@ -90,9 +95,9 @@
 ## Feature flags
 
 - [ ] Any feature that is not fully complete, or that changes behavior a
-      tenant is not yet ready for, is gated behind a feature flag with a
-      documented default (off for incomplete work, gradually enabled per
-      the rollout plan in
+      buyer's deployment is not yet ready for, is gated behind a feature
+      flag with a documented default (off for incomplete work, gradually
+      enabled per the rollout plan in
       [`ci-cd-standards.md`](./ci-cd-standards.md#deployment-strategy)).
 - [ ] The flag has a named owner and a removal plan — flags are not left
       permanently in the codebase once a feature is fully rolled out.

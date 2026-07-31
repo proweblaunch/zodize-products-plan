@@ -43,9 +43,9 @@ legal departments.
 
 | Capability | Comparable to | Zodize differentiation |
 |---|---|---|
-| Matter management + billing | Clio, MyCase | Built on ZodiCore's shared audit/RBAC core instead of a standalone legal-only stack |
+| Matter management + billing | Clio, MyCase | Built on the same audited, self-hosted base engine (audit logging, RBAC) as every other Zodize product, sold as source code the firm owns and hosts, instead of a hosted, standalone legal-only SaaS stack |
 | Trust/IOLTA accounting | Clio Manage Trust Accounting, LeanLaw | Trust ledger enforced as a segregated, append-only structure at the data-model level, matching bar trust-accounting rules |
-| Document management with version control | NetDocuments, iManage | Version history and access control share the same engine as ZodiCore's platform-wide version history capability |
+| Document management with version control | NetDocuments, iManage | Version history and access control share the same inherited engine used across every Zodize product's document/file handling |
 | Conflict-of-interest checking | Intapp Conflicts, Clio's basic conflict search | Conflict search spans every matter, party, and related-entity field firm-wide, not just party-name matching |
 | Court deadline/calendar with SOL tracking | CalendarRules, Clio Court Rules | Deadline rule engine surfaces escalating alerts tied to matter risk level, not a single reminder |
 
@@ -155,36 +155,76 @@ inherited baseline. ZodiLaw-specific additions:
 
 ## 11. Architecture
 
-ZodiLaw is a tenant application on [ZodiCore](../ZodiCore/SPEC.md),
-consuming `zodize/core-identity`, `zodize/core-billing`,
-`zodize/core-notifications`, `zodize/core-permissions`, and
-`zodize/core-plugins` per ZodiCore's
-[Architecture](../ZodiCore/SPEC.md#11-architecture) section. ZodiLaw adds a
-`PrivilegeSegregationContract` layered on ZodiCore's RBAC engine that scopes
-matter access to assigned timekeepers and enforces ethical-wall exceptions
-per matter, distinct from standard role-based permission — a user with a
-firm-wide "Attorney" role does not automatically see every matter, only
-matters they are assigned to or explicitly granted access to. Trust ledger
-writes go through a dedicated `TrustLedgerContract` enforcing double-entry,
-append-only, client/matter-segregated posting, independent of ZodiCore's
-platform billing ledger (ZodiLaw's trust ledger represents client funds
-under fiduciary duty, not Zodize's own revenue). Multi-office firms map onto
-ZodiCore's tenant/company/branch hierarchy per
-[multi-tenancy.md](../../architecture/multi-tenancy.md).
+ZodiLaw is a standalone, self-hosted Laravel application, built by cloning
+the sanitized base codebase and running the
+[genericization checklist](../../architecture/product-genericization-checklist.md)
+per
+[base-codebase-strategy.md](../../architecture/base-codebase-strategy.md).
+The clone strips every banking-specific table that doesn't apply to a legal
+practice management product — `loans`/`loan_plans`, `dps`/`dps_plans`,
+`fdr`/`fdr_plans`, `other_banks`, `beneficiaries`,
+`airtime_operators`/`airtime_configs` — and keeps the
+`branches`/`branch_staff` guard, re-purposed rather than dropped: a
+multi-office firm's location-specific support staff are modeled as
+branch-scoped staff per
+[product-genericization-checklist.md § Step 4](../../architecture/product-genericization-checklist.md#step-4--confirm-guard-configuration-matches-the-products-needs),
+with "branch" mapped to "office" in ZodiLaw's own admin navigation, while
+Attorneys and Paralegals — whose access must be scoped per matter rather
+than per office — authenticate through the inherited `admin` guard.
+
+ZodiLaw inherits the base engine's admin settings/branding, payment
+gateways (for invoice and trust deposit processing), RBAC/auth, i18n, cron,
+extension toggles, and CMS/page builder as-is — see
+[base-codebase-strategy.md](../../architecture/base-codebase-strategy.md#inherited-as-is-the-admin-engine-every-product-keeps).
+On top of that inherited engine, ZodiLaw builds its own domain modules
+(Intake & Conflicts, Matter Management, Time & Billing, Trust Accounting,
+Documents, Calendar & Deadlines, Client Portal) per
+[`module-template.md`](../../templates/module-template.md).
+
+Two additions go beyond ordinary domain-module layering, both built on top
+of the inherited engine rather than replacing any part of it:
+
+- A `PrivilegeSegregationContract` service, layered on the inherited
+  `Role`/`Permission` RBAC engine, that scopes matter access to assigned
+  timekeepers and enforces ethical-wall exceptions per matter — a user with
+  a firm-wide "Attorney" role does not automatically see every matter, only
+  matters they are assigned to or explicitly granted access to. This is the
+  Policy-layer pattern described in
+  [admin-template.md](../../templates/admin-template.md#roles--permissions-inherited-not-spatie):
+  an additional rule on top of the inherited RBAC engine, not a second,
+  competing permission system.
+- A dedicated `TrustLedgerContract`, built on top of the inherited
+  wallet/ledger pattern rather than reusing the single wallet balance
+  directly (see
+  [wallet-system.md](../../standards/wallet-system.md#what-a-products-domain-modules-do-with-this-engine)),
+  enforcing double-entry, append-only, client/matter-segregated posting
+  fully independent of ordinary operating-account transactions, so client
+  trust funds under fiduciary duty can never commingle with firm revenue in
+  code.
+
+Each ZodiLaw deployment belongs to exactly one law firm, running on their
+own hosting with their own database, with zero runtime dependency on any
+other Zodize product or Zodize-operated service, per
+[single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md).
+This also structurally eliminates the opposing-counsel data-exposure risk a
+shared multi-tenant platform would carry: two firms on opposite sides of a
+matter run on entirely separate, unconnected codebases and databases, not
+merely logically isolated rows in one shared database.
 
 ## 12. Technology
 
-Laravel + Vue per the shared stack
-([coding-standards-php-laravel.md](../../development/coding-standards-php-laravel.md),
-[coding-standards-vue.md](../../development/coding-standards-vue.md));
-PostgreSQL + Redis per
+Laravel 11 + PHP ^8.3 per the inherited base codebase
+([coding-standards-php-laravel.md](../../development/coding-standards-php-laravel.md)),
+with Blade/Vue for new module UI per
+[coding-standards-vue.md](../../development/coding-standards-vue.md);
+MySQL/MariaDB per the base codebase's inherited schema, matching
 [database-standards.md](../../development/database-standards.md); document
-storage with full version history per tenant-scoped document storage
-conventions; payment processing (invoice payment, trust deposits) via
-ZodiCore's payment gateway abstraction
-(§20 of [ZodiCore's SPEC.md](../ZodiCore/SPEC.md#20-payment-gateways-wallet-accounting-taxes-invoices)),
-with trust deposits routed to a dedicated trust bank account distinct from
-the firm's operating account at the integration level.
+storage with full version history per this deployment's own storage
+conventions; payment processing (invoice payment, trust deposits) via the
+inherited base codebase's payment gateway abstraction (see
+[payment-gateways.md](../../standards/payment-gateways.md)), with trust
+deposits routed to a dedicated trust bank account distinct from the firm's
+operating account at the integration level.
 
 ## 13. Modules & Submodules
 
@@ -200,19 +240,25 @@ the firm's operating account at the integration level.
 
 ## 14. Core Data Model
 
-Full ER diagram queued (§ Roadmap). Core entities:
+Full ER diagram queued (§ Roadmap). Every entity below belongs to the one
+firm that owns this deployment — there is no `tenant_id` column anywhere in
+this schema, per
+[single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md).
+`office_id` (the re-purposed `branch_staff` scoping from §11) provides
+multi-office scoping within that one deployment where the firm's own admin
+work requires it.
 
 | Entity | Key columns |
 |---|---|
-| `matters` | id, tenant_id, client_id, matter_number, status, practice_area, opened_at |
+| `matters` | id, client_id, matter_number, status, practice_area, opened_at |
 | `parties` | id, matter_id, party_type (client/adverse/related), name, entity_type |
 | `conflict_checks` | id, intake_id, matched_matter_id, matched_party_id, resolution (cleared/waived/declined) |
 | `timekeeper_assignments` | id, matter_id, user_id, role, ethical_wall_flag |
 | `time_entries` | id, matter_id, timekeeper_id, minutes, rate, narrative, billed_status |
 | `billing_arrangements` | id, matter_id, arrangement_type (hourly/flat/contingency), rate_or_fee |
 | `invoices` | id, matter_id, client_id, period_start, period_end, amount, status |
-| `trust_ledger_entries` | id, tenant_id, client_id, matter_id, entry_type, amount, posted_at |
-| `trust_reconciliations` | id, tenant_id, period, bank_balance, ledger_balance, variance, closed_by |
+| `trust_ledger_entries` | id, client_id, matter_id, entry_type, amount, posted_at |
+| `trust_reconciliations` | id, period, bank_balance, ledger_balance, variance, closed_by |
 | `documents` | id, matter_id, title, current_version_id, privilege_status (privileged/shareable) |
 | `document_versions` | id, document_id, version_number, storage_key, created_by, created_at |
 | `deadlines` | id, matter_id, deadline_type, triggering_event_date, due_date, jurisdiction_rule_id |
@@ -272,17 +318,22 @@ All channels follow
 
 ## 18. Permissions & Roles
 
-Inherits ZodiCore's default system roles
-([rbac-permissions.md](../../security/rbac-permissions.md#default-system-roles))
-plus ZodiLaw-specific roles: `Managing Partner`, `Attorney`,
+Built on the inherited `Role`/`Permission` engine and `admin` guard, plus
+the re-purposed `branch_staff` guard for office-scoped support staff, per
+[admin-template.md](../../templates/admin-template.md#roles--permissions-inherited-not-spatie).
+ZodiLaw's own roles: `Managing Partner`, `Attorney`,
 `Paralegal/Legal Assistant`, `Billing/Trust Administrator`, `Client`
-(portal-only, scoped to own matters). Key permissions: `matters.open`
-(requires cleared or waived conflict check), `conflicts.waive` (Managing
-Partner only), `trust_ledger.post` (Billing/Trust Administrator only, never
-Attorney or Paralegal directly), `trust_reconciliation.close`,
+(portal-only, scoped to own matters). Key permissions, registered into the
+inherited permission system per
+[permission-template.md](../../templates/permission-template.md):
+`matters.open` (requires cleared or waived conflict check), `conflicts.waive`
+(Managing Partner only), `trust_ledger.post` (Billing/Trust Administrator
+only, never Attorney or Paralegal directly), `trust_reconciliation.close`,
 `documents.mark_shareable`, `deadlines.acknowledge`. Matter-level access is
 additionally scoped by `PrivilegeSegregationContract` (§11) regardless of
-firm-wide role.
+firm-wide role — the attorney-client privilege segregation need is an
+additional Policy-layer rule on top of the inherited RBAC, not a separate
+system.
 
 ## 19. Workflows & Approval Chains
 
@@ -326,9 +377,9 @@ privilege segregation was maintained.
 - **Court e-filing systems**: jurisdiction e-filing integration for
   applicable practice areas (e.g. PACER-adjacent federal court systems,
   state e-filing portals) to auto-populate filing-triggered deadlines.
-- **Payment processing**: invoice and trust deposit processing via
-  ZodiCore's payment gateway abstraction, with trust deposits routed to a
-  segregated trust bank account.
+- **Payment processing**: invoice and trust deposit processing via the
+  inherited base codebase's payment gateway abstraction, with trust
+  deposits routed to a segregated trust bank account.
 - **Accounting export**: QuickBooks-compatible export for firm operating
   books maintained outside ZodiLaw's trust ledger.
 - **Legal research platforms**: outbound linking/citation integration with
@@ -346,8 +397,8 @@ privilege segregation was maintained.
   requiring attorney review before client-portal sharing.
 - AI-assisted time entry narrative suggestions from calendar/document
   activity, with the timekeeper confirming before the entry is billable.
-- Anomaly detection on trust ledger activity, extending ZodiCore's audit
-  anomaly detection (§23 of [ZodiCore's SPEC.md](../ZodiCore/SPEC.md#23-ai-features)).
+- Anomaly detection on trust ledger activity, built on ZodiLaw's own audit
+  log data per [audit-logging.md](../../security/audit-logging.md).
 
 ## 24. Automation, Scheduled Jobs, CLI Commands
 
@@ -397,9 +448,13 @@ applies. ZodiLaw-specific requirements:
   a professional-responsibility risk.
 - **Client data confidentiality**: client PII and matter content are
   encrypted at rest per
-  [data-protection-privacy.md](../../security/data-protection-privacy.md);
-  cross-tenant isolation is tested per ZodiCore's cross-tenant isolation
-  suite, critical here because opposing firms may both be Zodize tenants.
+  [data-protection-privacy.md](../../security/data-protection-privacy.md).
+  Because each ZodiLaw deployment is a fully independent, self-hosted
+  application per §11, there is no shared database or runtime for
+  confidentiality to leak across even when two firms on opposite sides of a
+  matter both run ZodiLaw — this eliminates the cross-tenant isolation risk
+  a hosted multi-tenant platform would carry by construction, per
+  [single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md#what-single-tenant-changes-in-the-data-model).
 
 ## 28. Testing Requirements
 
@@ -444,14 +499,15 @@ See [production-readiness-checklist.md](../../checklists/production-readiness-ch
 
 ## 33. Known Risks
 
-- Deadline-calculation defects carry direct malpractice exposure for
-  tenants — mitigated by the escalating-alert design and acknowledgment
-  tracking in §7/§19, but jurisdiction rule-set accuracy requires ongoing
-  legal-content maintenance, not just software correctness.
+- Deadline-calculation defects carry direct malpractice exposure for the
+  firms running this product — mitigated by the escalating-alert design and
+  acknowledgment tracking in §7/§19, but jurisdiction rule-set accuracy
+  requires ongoing legal-content maintenance, not just software correctness.
 - Trust accounting defects carry bar-discipline and disbarment exposure for
-  tenants — mitigated by the dedicated integrity test suite in §28, but
-  this remains the module requiring the highest engineering scrutiny in the
-  product, matching ZodiEstate's equivalent risk posture.
+  the firms running this product — mitigated by the dedicated integrity
+  test suite in §28, but this remains the module requiring the highest
+  engineering scrutiny in the product, matching ZodiEstate's equivalent risk
+  posture.
 
 ## 34. Future Improvements
 
@@ -461,7 +517,12 @@ See [production-readiness-checklist.md](../../checklists/production-readiness-ch
 
 ## Roadmap (spec depth)
 
-This spec is Foundation-depth. Queued for Deep-depth expansion: full ER
-diagram and migration set (companion `DATA_MODEL.md`), full endpoint
-catalog (companion `API_REFERENCE.md`), full jurisdiction deadline rule-set
-library, and a complete report catalog beyond the summary list in §21.
+This spec is Foundation-depth. Its Architecture (§11), Core Data Model
+(§14), and Permissions & Roles (§18) sections were revised to the
+standalone, self-hosted, single-tenant model in
+[single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md);
+no product-domain content (vision, personas, journeys, trust/deadline
+workflows) changed. Queued for Deep-depth expansion: full ER diagram and
+migration set (companion `DATA_MODEL.md`), full endpoint catalog (companion
+`API_REFERENCE.md`), full jurisdiction deadline rule-set library, and a
+complete report catalog beyond the summary list in §21.

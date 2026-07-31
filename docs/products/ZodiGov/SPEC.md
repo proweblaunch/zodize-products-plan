@@ -49,7 +49,7 @@ districts, and state agency service-delivery operations.
 | Permit/license workflow | Accela, OpenGov Permitting & Licensing | Configurable workflow builder shared with every Zodize product's approval-chain infrastructure |
 | Public records management | NextRequest, GovQA | Records requests share ZodiGov's audit trail and redaction workflow end to end |
 | Open data / transparency portal | Socrata, OpenGov | Transparency portal is a first-class module, not a separate CKAN-style deployment |
-| Case management across departments | Accela, Tyler Technologies EnerGov | Department routing built on ZodiCore's RBAC/tenancy model, avoiding department-siloed logins |
+| Case management across departments | Accela, Tyler Technologies EnerGov | Department routing built on the same inherited RBAC and branch-scoping model every Zodize product uses for location/unit staff, avoiding department-siloed logins |
 
 ## 6. Personas
 
@@ -156,36 +156,68 @@ inherited baseline. ZodiGov-specific additions:
 
 ## 11. Architecture
 
-ZodiGov is a tenant application on [ZodiCore](../ZodiCore/SPEC.md),
-consuming `zodize/core-identity`, `zodize/core-billing`,
-`zodize/core-notifications`, `zodize/core-permissions`, and
-`zodize/core-plugins` per ZodiCore's
-[Architecture](../ZodiCore/SPEC.md#11-architecture) section. ZodiGov adds a
-department-scoped case-routing engine (`CaseRoutingContract`) built on
-ZodiCore's RBAC and workflow-builder patterns, and a `PublicRecordContract`
-that governs what data is safe to surface on the public transparency
-portal — every entity exposed there passes through an explicit
-public-visibility policy rather than being exposed by default. Departments
-map onto ZodiCore's tenant/company/branch hierarchy per
-[multi-tenancy.md](../../architecture/multi-tenancy.md), letting a single
-municipality tenant model each department (Public Works, Planning, Parks)
-as a branch with its own case queue and staff roster.
+ZodiGov is a standalone, self-hosted Laravel application, built by cloning
+the sanitized base codebase and running the
+[genericization checklist](../../architecture/product-genericization-checklist.md)
+per
+[base-codebase-strategy.md](../../architecture/base-codebase-strategy.md).
+The clone strips every banking-specific table that doesn't apply to a
+government service-delivery product — `loans`/`loan_plans`,
+`dps`/`dps_plans`, `fdr`/`fdr_plans`, `other_banks`, `beneficiaries`,
+`airtime_operators`/`airtime_configs` — and keeps the
+`branches`/`branch_staff` guard, re-purposed rather than dropped: a
+municipality's departments (Public Works, Planning, Parks) are a direct fit
+for the inherited branch-scoped staff pattern per
+[product-genericization-checklist.md § Step 4](../../architecture/product-genericization-checklist.md#step-4--confirm-guard-configuration-matches-the-products-needs),
+with "branch" mapped to "department" throughout ZodiGov's own admin
+navigation — each department gets its own case queue and staff roster via
+the inherited guard/RBAC pattern, not a rebuilt one.
+
+ZodiGov inherits the base engine's admin settings/branding, payment
+gateways (for permit/license fee collection), RBAC/auth, i18n, cron,
+extension toggles, and CMS/page builder as-is — see
+[base-codebase-strategy.md](../../architecture/base-codebase-strategy.md#inherited-as-is-the-admin-engine-every-product-keeps).
+On top of that inherited engine, ZodiGov builds its own domain modules
+(Service Requests, Permits & Licensing, Public Records, Case Routing,
+Transparency Portal, Citizen Portal, Department Tools) per
+[`module-template.md`](../../templates/module-template.md).
+
+Two additions go beyond ordinary domain-module layering, both built on top
+of the inherited engine rather than replacing any part of it:
+
+- A department-scoped case-routing engine (`CaseRoutingContract`), built on
+  the inherited `Role`/`Permission` RBAC and the re-purposed
+  `branch_staff`/department scoping above.
+- A `PublicRecordContract` that governs what data is safe to surface on the
+  public transparency portal — every entity exposed there passes through an
+  explicit public-visibility policy rather than being exposed by default
+  (§27).
+
+Each ZodiGov deployment belongs to exactly one municipality, county, or
+agency, running on their own hosting with their own database, with zero
+runtime dependency on any other Zodize product or Zodize-operated service,
+per
+[single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md).
+A regional service authority spanning multiple municipalities is a separate
+deployment per municipality unless and until the multi-jurisdiction
+shared-services model in §32 is scoped and built.
 
 ## 12. Technology
 
-Laravel + Vue per the shared stack
-([coding-standards-php-laravel.md](../../development/coding-standards-php-laravel.md),
-[coding-standards-vue.md](../../development/coding-standards-vue.md));
-PostgreSQL + Redis per
+Laravel 11 + PHP ^8.3 per the inherited base codebase
+([coding-standards-php-laravel.md](../../development/coding-standards-php-laravel.md)),
+with Blade/Vue for new module UI per
+[coding-standards-vue.md](../../development/coding-standards-vue.md);
+MySQL/MariaDB per the base codebase's inherited schema, matching
 [database-standards.md](../../development/database-standards.md); the
 citizen and transparency portals are built against
 [accessibility.md](../../design-system/accessibility.md) and audited with
 automated + manual WCAG 2.1 AA testing as part of CI, not only at launch;
-payment processing (permit/license fees) via ZodiCore's payment gateway
-abstraction
-(§20 of [ZodiCore's SPEC.md](../ZodiCore/SPEC.md#20-payment-gateways-wallet-accounting-taxes-invoices));
-geolocation/mapping via a standards-based mapping provider for the service
-request map and transparency portal.
+payment processing (permit/license fees) via the inherited base codebase's
+payment gateway abstraction (see
+[payment-gateways.md](../../standards/payment-gateways.md)); geolocation/
+mapping via a standards-based mapping provider for the service request map
+and transparency portal.
 
 ## 13. Modules & Submodules
 
@@ -201,12 +233,17 @@ request map and transparency portal.
 
 ## 14. Core Data Model
 
-Full ER diagram queued (§ Roadmap). Core entities:
+Full ER diagram queued (§ Roadmap). Every entity below belongs to the one
+municipality, county, or agency that owns this deployment — there is no
+`tenant_id` column anywhere in this schema, per
+[single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md).
+`department_id` (the re-purposed `branch_staff` scoping from §11) is the
+deployment's own internal department scoping, not tenancy.
 
 | Entity | Key columns |
 |---|---|
-| `departments` | id, tenant_id (maps to branch), name, sla_default_hours |
-| `service_requests` | id, tenant_id, department_id, category, status, location_lat, location_lng, submitted_by |
+| `departments` | id, name, sla_default_hours |
+| `service_requests` | id, department_id, category, status, location_lat, location_lng, submitted_by |
 | `service_request_updates` | id, service_request_id, is_public, note, created_by, created_at |
 | `permit_applications` | id, applicant_id, permit_type, status, submitted_at, fee_amount, fee_paid_at |
 | `permit_review_stages` | id, permit_application_id, stage_name, reviewer_id, decision, decided_at |
@@ -214,7 +251,7 @@ Full ER diagram queued (§ Roadmap). Core entities:
 | `records_requests` | id, requester_id, description, statutory_deadline, status, released_at |
 | `records_request_documents` | id, records_request_id, document_id, redaction_applied, redaction_reason |
 | `cases` | id, department_id, case_type (service_request/permit/records), sla_due_at, escalated_at, assigned_to |
-| `public_datasets` | id, tenant_id, dataset_name, source_entity, refresh_frequency, visibility_policy_id |
+| `public_datasets` | id, dataset_name, source_entity, refresh_frequency, visibility_policy_id |
 | `visibility_policies` | id, entity_type, field_allowlist, pii_suppression_rules |
 
 ## 15. Key API Endpoints
@@ -272,12 +309,16 @@ All channels follow
 
 ## 18. Permissions & Roles
 
-Inherits ZodiCore's default system roles
-([rbac-permissions.md](../../security/rbac-permissions.md#default-system-roles))
-plus ZodiGov-specific roles: `Department Staff/Case Worker`,
+Built on the inherited `Role`/`Permission` engine and `admin` guard, plus
+the re-purposed `branch_staff` guard for department-scoped staff, per
+[admin-template.md](../../templates/admin-template.md#roles--permissions-inherited-not-spatie).
+ZodiGov's own roles: `Department Staff/Case Worker`,
 `Permit/License Reviewer`, `Records Officer`, `Department Supervisor`,
 `Agency Administrator`, `Citizen` (portal-only, scoped to own requests/
-applications). Key permissions: `service_requests.assign`,
+applications). Key permissions, registered into the inherited permission
+system per
+[permission-template.md](../../templates/permission-template.md):
+`service_requests.assign`,
 `permits.review_decide`, `permits.issue`, `records_requests.redact`
 (Records Officer only), `records_requests.release` (requires Records
 Officer + Department Supervisor sign-off for exempt-content releases, per
@@ -287,7 +328,7 @@ gated by `PublicRecordContract`).
 ## 19. Workflows & Approval Chains
 
 - **Permit multi-stage review**: an application advances through
-  tenant-configured review stages (e.g. planning → code → fire); each stage
+  admin-configured review stages (e.g. planning → code → fire); each stage
   requires an explicit decision (approve/request changes/deny) before
   advancing, and a denial at any stage halts issuance until resolved.
 - **Records request release with exempt content**: if any responsive
@@ -312,7 +353,7 @@ redaction and release, and dataset publication is immutably audit-logged
 per [audit-logging.md](../../security/audit-logging.md), supporting
 public-sector records-retention and open-government accountability
 requirements — the audit log itself is treated as a government record
-subject to the tenant's retention policy.
+subject to the agency's retention policy.
 
 ## 21. Reports & Analytics & Dashboards
 
@@ -332,8 +373,8 @@ subject to the tenant's retention policy.
 
 - **GIS/mapping**: standards-based mapping provider for service-request
   geolocation and the public transparency map.
-- **Payment processing**: permit/license fee collection via ZodiCore's
-  payment gateway abstraction.
+- **Payment processing**: permit/license fee collection via the inherited
+  base codebase's payment gateway abstraction.
 - **Open data publishing**: export-compatible with common open-data
   catalog standards so datasets can be cross-published to state/federal
   open-data portals where required.
@@ -353,9 +394,9 @@ subject to the tenant's retention policy.
   likely PII/exempt content spans), always requiring Records Officer
   confirmation before any redaction is applied — the AI never redacts or
   releases autonomously.
-- Anomaly detection on case escalation and SLA-miss patterns, extending
-  ZodiCore's audit anomaly detection
-  (§23 of [ZodiCore's SPEC.md](../ZodiCore/SPEC.md#23-ai-features)).
+- Anomaly detection on case escalation and SLA-miss patterns, built on
+  ZodiGov's own audit log data per
+  [audit-logging.md](../../security/audit-logging.md).
 
 ## 24. Automation, Scheduled Jobs, CLI Commands
 
@@ -399,15 +440,15 @@ applies. ZodiGov-specific requirements:
   transparency portal passes through an explicit `visibility_policy_id`
   allowlist (§14, §19); there is no default-exposed entity — publication is
   opt-in and approved, preventing accidental PII leakage to the public.
-- **Procurement-grade security review**: ZodiGov tenants undergo a security
-  review process matching public-sector procurement expectations (e.g.
-  StateRAMP/FedRAMP-adjacent control mapping where applicable to the
-  tenant's jurisdiction), documented against
+- **Procurement-grade security review**: each ZodiGov deployment undergoes
+  a security review process matching public-sector procurement
+  expectations (e.g. StateRAMP/FedRAMP-adjacent control mapping where
+  applicable to the agency's jurisdiction), documented against
   [security-checklist.md](../../checklists/security-checklist.md) as part
-  of onboarding, in addition to Zodize's standard annual penetration
-  testing baseline.
+  of onboarding, in addition to the standard security review baseline every
+  Zodize product's codebase undergoes before release.
 - **Records retention**: service requests, permit records, and public
-  records request logs follow the tenant's configured government
+  records request logs follow the agency's configured government
   records-retention schedule per
   [data-protection-privacy.md](../../security/data-protection-privacy.md),
   which for government records is typically longer and more prescriptive
@@ -427,7 +468,7 @@ approved `visibility_policy_id`.
 
 Per [deployment-template.md](../../templates/deployment-template.md).
 ZodiGov deployments additionally require the procurement-grade security
-review sign-off in §27 before a tenant's public-facing surfaces go live.
+review sign-off in §27 before the agency's public-facing surfaces go live.
 
 ## 30. Acceptance Criteria
 
@@ -467,7 +508,8 @@ described in §27/§29 before go-live.
 ## 33. Known Risks
 
 - Accessibility regressions on the public portal carry direct legal
-  exposure for government tenants — mitigated by the mandatory CI gate in
+  exposure for the governments running this product — mitigated by the
+  mandatory CI gate in
   §28, but continued manual audit discipline is required as new components
   ship, since automated tooling alone does not catch every WCAG criterion.
 - Public transparency portal PII exposure is a high-severity risk specific
@@ -485,8 +527,12 @@ described in §27/§29 before go-live.
 
 ## Roadmap (spec depth)
 
-This spec is Foundation-depth. Queued for Deep-depth expansion: full ER
-diagram and migration set (companion `DATA_MODEL.md`), full endpoint
-catalog (companion `API_REFERENCE.md`), full jurisdiction statutory
-deadline rule library, and a complete report catalog beyond the summary
-list in §21.
+This spec is Foundation-depth. Its Architecture (§11), Core Data Model
+(§14), and Permissions & Roles (§18) sections were revised to the
+standalone, self-hosted, single-tenant model in
+[single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md);
+no product-domain content (vision, personas, journeys, case/records
+workflows) changed. Queued for Deep-depth expansion: full ER diagram and
+migration set (companion `DATA_MODEL.md`), full endpoint catalog (companion
+`API_REFERENCE.md`), full jurisdiction statutory deadline rule library, and
+a complete report catalog beyond the summary list in §21.

@@ -8,9 +8,18 @@
 > this document. See [PRODUCT_CATALOG.md](../../../PRODUCT_CATALOG.md) for
 > spec status definitions.
 
-Built on [ZodiCore](../ZodiCore/SPEC.md) — ZodiCapital does not reimplement
-identity, tenancy, billing, notifications, RBAC, plugins, or audit logging;
-it consumes those services and adds fund-management-domain modules on top.
+ZodiCapital is a standalone, self-hosted Laravel application built by
+cloning the sanitized [base codebase](../../architecture/base-codebase-strategy.md),
+running the
+[genericization checklist](../../architecture/product-genericization-checklist.md)
+to strip the base engine's banking-specific loan/DPS/FDR/branch tables, and
+layering fund-management-domain modules on top. It does not depend on any
+other Zodize product or on a central "ZodiCore" platform for identity,
+billing, notifications, or tenancy — see
+[single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md).
+`ZodiCore` is itself just another standalone product in the catalog (a
+general-purpose back-office/ERP starter), not a platform ZodiCapital runs
+on.
 
 ## 1. Vision
 
@@ -26,11 +35,12 @@ lifecycle from formation to wind-down on one platform.
 Fund managers today stitch together a fund administrator's portal, a
 separate investor-relations CRM, a spreadsheet-based capital-call and
 distribution waterfall, and a manually assembled quarterly reporting
-package. ZodiCapital exists to give a fund manager one coherent system —
-fund structure, capital accounts, calls/distributions, NAV, performance
-reporting, and an investor portal — built on ZodiCore's identity and audit
-backbone, so LPs get a real self-service portal and the GP gets a real
-system of record instead of a reconciled spreadsheet.
+package. ZodiCapital exists to give a fund manager one coherent, self-hosted
+system — fund structure, capital accounts, calls/distributions, NAV,
+performance reporting, and an investor portal — built on a base codebase
+whose RBAC, KYC, and audit engine already work, so LPs get a real
+self-service portal and the GP gets a real system of record instead of a
+reconciled spreadsheet.
 
 ## 3. Target Market
 
@@ -50,7 +60,7 @@ funds.
 
 | Capability | Comparable to | Zodize differentiation |
 |---|---|---|
-| Fund administration platform | Carta (fund admin), Allvue Systems, eFront | Ships with tenant/RBAC/audit already built via ZodiCore, faster to stand up compliant fund operations |
+| Fund administration platform | Carta (fund admin), Allvue Systems, eFront | Ships with RBAC/audit already built into the inherited base codebase, faster to stand up compliant fund operations |
 | Investor portal/CRM | Juniper Square, Dynamo Software | Investor portal shares one identity and permission model with fund accounting, not a separate synced system |
 | Capital call/distribution workflow | Anduin, Carta subscription workflows | Capital calls, distributions, and NAV share one ledger of record with the investor portal |
 | Performance reporting (IRR/MOIC) | PitchBook fund reporting tools, Preqin-adjacent analytics | Performance metrics computed directly from the cash-flow ledger, not a reconciled downstream export |
@@ -69,7 +79,10 @@ funds.
   portal.
 - **Compliance Officer** — manages accredited-investor verification and
   regulatory filings.
-- **Zodize Support/Ops** — as defined in [ZodiCore §6](../ZodiCore/SPEC.md#6-personas).
+- **Buyer's own IT/support staff** — the only support layer this deployment
+  has; there is no Zodize-operated support console, since each deployment is
+  the buyer's own standalone codebase (see
+  [admin-template.md](../../templates/admin-template.md)).
 
 ## 7. User Journeys
 
@@ -117,8 +130,8 @@ funds.
 
 - Fund structures: LP/GP entity modeling, commitment tracking, fee
   structure (management fee, hurdle rate) and carried-interest/waterfall
-  configuration, support for multiple funds and co-investment vehicles per
-  tenant.
+  configuration, support for multiple funds and co-investment vehicles
+  within one deployment.
 - Capital calls: pro-rata call calculation, call notice generation and
   delivery, funding status tracking, late-payment handling.
 - Distributions: waterfall modeling (return of capital, preferred return,
@@ -163,16 +176,36 @@ inherited baseline. ZodiCapital-specific additions:
 
 ## 11. Architecture
 
-ZodiCapital is a Laravel application consuming ZodiCore's identity,
-tenancy, billing, notification, RBAC, plugin, and audit packages exactly as
-described in [ZodiCore §11](../ZodiCore/SPEC.md#11-architecture). It adds a
-`zodize/fund-accounting` domain package providing capital account ledger
-logic (calls, distributions, NAV) and a `zodize/investor-portal` package
-providing the LP-facing experience, both registering into ZodiCore's audit
-log and RBAC policy registry. The investor portal is modeled as a
-restricted-scope view of the same tenant data GPs manage, using ZodiCore's
-RBAC to scope each LP to only their own capital account and fund-level
-public documents, never another LP's data.
+ZodiCapital is built by cloning the sanitized
+[base codebase](../../architecture/base-codebase-strategy.md) — a single,
+independent Laravel application the buyer deploys entirely on their own
+shared/VPS hosting, per
+[single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md).
+Building ZodiCapital means running the full
+[genericization checklist](../../architecture/product-genericization-checklist.md):
+the inherited `loans`/`dps`/`fdr`/`branches`/`other_banks` tables and
+controllers are stripped (they do not apply to fund management), and
+ZodiCapital keeps and builds on top of the base engine's RBAC/auth
+(`Role`/`Permission` models), KYC, i18n, and admin configuration surface
+(see
+[base-codebase-strategy.md](../../architecture/base-codebase-strategy.md#inherited-as-is-the-admin-engine-every-product-keeps)).
+
+On that foundation, ZodiCapital adds its own domain modules — Fund
+Structures, Capital Calls, Distributions, NAV & Valuation, Investor Portal,
+Performance Reporting, Compliance, and Subscription & E-Signature — as new,
+clearly bounded modules per
+[module-template.md](../../templates/module-template.md), registering into
+the inherited audit log and RBAC policy registry rather than building
+parallel systems. The investor portal is a restricted-scope view within the
+same single-business deployment the GP manages, using the inherited RBAC
+engine to scope each LP to only their own capital account and fund-level
+public documents, never another LP's data — this is ordinary
+row-level-authorization, not tenant isolation, since there is exactly one
+fund manager's deployment. ZodiCapital has no runtime dependency on any
+other Zodize product or on a Zodize-operated central service; the only
+external dependencies are the third-party e-signature, accreditation
+verification, and valuation-data integrations the buyer's own fund manager
+configures (§22).
 
 ## 12. Technology
 
@@ -201,12 +234,18 @@ provider-abstracted services (see §22).
 ## 14. Core Data Model
 
 The 11 entities below are the load-bearing core; full ER diagram is queued
-(see [Roadmap (spec depth)](#roadmap-spec-depth)).
+(see [Roadmap (spec depth)](#roadmap-spec-depth)). There is no `tenant_id`
+column anywhere in this model — each deployed instance belongs to exactly
+one fund manager, per
+[single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md#what-single-tenant-changes-in-the-data-model).
+A fund manager running multiple funds within their one deployment models
+that as multiple `funds` rows scoped by `fund_id` throughout, not as
+tenancy.
 
 | Entity | Key columns |
 |---|---|
-| `funds` | id, tenant_id, name, vintage_year, target_size, fee_structure_json, waterfall_config_json |
-| `investors` | id, tenant_id, legal_name, investor_type, accreditation_status, accreditation_expires_at |
+| `funds` | id, name, vintage_year, target_size, base_currency, fee_structure_json, waterfall_config_json |
+| `investors` | id, legal_name, investor_type, accreditation_status, accreditation_expires_at |
 | `commitments` | id, fund_id, investor_id, committed_amount, commitment_date, status |
 | `capital_accounts` | id, commitment_id, called_to_date, distributed_to_date, current_nav, updated_at |
 | `capital_calls` | id, fund_id, call_number, total_call_amount, due_date, status, approved_by |
@@ -216,6 +255,25 @@ The 11 entities below are the load-bearing core; full ER diagram is queued
 | `nav_valuations` | id, fund_id, valuation_date, nav_amount, methodology, approved_by |
 | `subscription_documents` | id, commitment_id, document_id, esignature_status, signed_at |
 | `performance_snapshots` | id, fund_id, as_of_date, irr, moic, dpi, tvpi |
+
+**Multi-currency**: ZodiCapital operates single-base-currency by default —
+each `funds` row carries its own `base_currency`, and every call/
+distribution/NAV amount for that fund is recorded in that fund's base
+currency, per
+[ADR-0002](../../decisions/0002-single-currency-wallet-by-default.md). This
+covers the common case of a single-currency fund calling capital from and
+distributing to LPs in one currency. A fund manager whose LP base commits
+and is called in multiple currencies (a genuinely global LP base, tracked
+as future work in §32) MUST extend the pattern explicitly per
+[wallet-system.md's Multi-currency gap](../../standards/wallet-system.md#multi-currency-gap)
+rather than the base engine assuming it: a `capital_account_balances` table
+(`id`, `capital_account_id`, `currency`, `called_to_date`,
+`distributed_to_date`, `updated_at`) scoped per `capital_account_id`, with
+its own append-only `capital_account_ledger_entries` table
+(`id`, `capital_account_balance_id`, `amount` (signed), `currency`,
+`trigger` (capital_call/distribution/fx_revaluation), `post_balance_snapshot`,
+`reference_id`, `created_at`) mirroring the inherited `Transaction` model's
+invariants.
 
 ## 15. Key API Endpoints
 
@@ -249,7 +307,7 @@ conform to [api-standards.md](../../development/api-standards.md) and
 
 ## 16. Events
 
-Domain events registered on ZodiCore's event bus (see
+Domain events registered on the inherited event bus (see
 [caching-queues-events.md](../../architecture/caching-queues-events.md)):
 `fund.created`, `commitment.recorded`, `capital_call.initiated`,
 `capital_call.approved`, `capital_call.funded`, `capital_call.overdue`,
@@ -275,8 +333,11 @@ All channels follow
 
 ## 18. Permissions & Roles
 
-Extends [ZodiCore's default roles](../../security/rbac-permissions.md#default-system-roles)
-with fund-specific roles: `Fund Controller/CFO`, `Investor Relations`,
+Built on the inherited `Role`/`Permission` engine per
+[admin-template.md](../../templates/admin-template.md), with fund-specific
+roles registered on top of the
+[default system roles](../../security/rbac-permissions.md#default-system-roles):
+`Fund Controller/CFO`, `Investor Relations`,
 `General Partner`, `Compliance Officer`, `Limited Partner` (portal-scoped
 external role). Key permissions: `funds.manage`, `capital_calls.initiate`,
 `capital_calls.approve`, `distributions.initiate`, `distributions.approve`,
@@ -288,8 +349,8 @@ default, cannot be escalated to view other LPs' data). Full model per
 
 - **Capital call approval**: a capital call calculated by Fund Controller
   requires General Partner approval before notices send to LPs; the
-  approver must be distinct from the initiator for funds above a
-  tenant-configured size threshold.
+  approver must be distinct from the initiator for funds above an
+  admin-configured size threshold.
 - **Distribution approval**: a modeled distribution waterfall requires
   General Partner approval before disbursement, with the full waterfall
   calculation shown for review, matching
@@ -306,7 +367,7 @@ default, cannot be escalated to view other LPs' data). Full model per
 
 Every capital call, distribution, NAV valuation, accreditation decision,
 and subscription document signature writes an immutable audit entry via
-ZodiCore's audit log ([audit-logging.md](../../security/audit-logging.md)),
+the inherited audit log ([audit-logging.md](../../security/audit-logging.md)),
 capturing actor, timestamp, and before/after state. Capital account
 balances are computed from the append-only call/distribution/valuation
 ledger rather than stored as a mutable running total, so the full history
@@ -339,9 +400,9 @@ is always reconstructible and auditable.
   valuation data (e.g. PitchBook/Preqin-class data vendors) to support NAV
   and benchmark reporting.
 - **Banking/payment rails**: wire transfer initiation for capital call
-  funding and distribution disbursement, sharing the payment-rail
-  integration category described in
-  [ZodiBank §22](../ZodiBank/SPEC.md#22-integrations).
+  funding and distribution disbursement, via the same inherited
+  payment-gateway/withdrawal-method integration category described in
+  [payment-gateways.md](../../standards/payment-gateways.md).
 
 ## 23. AI Features
 
@@ -353,9 +414,9 @@ is always reconstructible and auditable.
   summary of fund performance and portfolio company highlights for Fund
   Controller/IR review and edit, never auto-published without human
   approval.
-- Anomaly detection on capital account activity, layered on top of
-  ZodiCore's audit-log anomaly detection ([ZodiCore §23](../ZodiCore/SPEC.md#23-ai-features)),
-  tuned for unusual call/distribution timing patterns.
+- Anomaly detection on capital account activity, layered on top of the
+  inherited audit log's anomaly detection, tuned for unusual
+  call/distribution timing patterns.
 
 ## 24. Automation, Scheduled Jobs, CLI Commands
 
@@ -365,12 +426,11 @@ is always reconstructible and auditable.
 - CLI commands (Artisan): `capital:calculate-call`,
   `capital:calculate-distribution`, `capital:recalculate-performance`,
   `capital:check-accreditation-expiry` — each requires the same
-  authorization context as its API equivalent, per
-  [ZodiCore §24](../ZodiCore/SPEC.md#24-automation-scheduled-jobs-cron-jobs-cli-commands).
+  authorization context as its API equivalent.
 
 ## 25. Seed/Demo Data
 
-`CapitalDemoSeeder` provisions a demo tenant with two or three demo funds
+`CapitalDemoSeeder` provisions the demo deployment with two or three demo funds
 across different vintage years, 30+ synthetic LPs with varied commitment
 sizes and accreditation states, a full capital call and distribution
 history spanning several years, quarterly NAV valuation history, and
@@ -395,7 +455,7 @@ applies, plus:
   plaintext.
 - **SOC2-equivalent controls**: change management and access review apply
   to fund accounting and investor portal modules with the same rigor as
-  the ZodiCore platform baseline.
+  the inherited base engine.
 - **KYC/AML and accredited-investor verification** required before a
   commitment can be recorded as active, with periodic re-verification
   enforced by scheduled job per §24, not manual process.
@@ -407,8 +467,9 @@ applies, plus:
   account data, per
   [authentication-authorization.md](../../security/authentication-authorization.md).
 - LP data isolation: an LP's portal session can never query another LP's
-  capital account, enforced at the RBAC policy layer per §11, with a
-  dedicated cross-LP isolation test per §28.
+  capital account, enforced at the RBAC policy layer per §11 (ordinary
+  row-level authorization within the one deployment, not tenant isolation),
+  with a dedicated cross-LP isolation test per §28.
 
 ## 28. Testing Requirements
 
@@ -478,10 +539,14 @@ before go-live.
 
 ## Roadmap (spec depth)
 
+This spec's Architecture and Core Data Model sections were revised to
+reflect the corrected standalone, self-hosted, single-tenant deployment
+model — see
+[single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md)
+and [base-codebase-strategy.md](../../architecture/base-codebase-strategy.md).
 This spec is Foundation-depth. Queued for Deep-depth expansion: a full ER
 diagram and migration set for the fund/capital-account/waterfall schema
 (companion `DATA_MODEL.md`), a complete endpoint catalog including the full
-investor portal surface (companion `API_REFERENCE.md`) matching
-[ZodiCore's structure](../ZodiCore/SPEC.md), and a full report catalog
-covering additional fund-type-specific reporting (real assets, fund-of-
-funds). Changes follow [CONTRIBUTING.md](../../../CONTRIBUTING.md).
+investor portal surface (companion `API_REFERENCE.md`), and a full report
+catalog covering additional fund-type-specific reporting (real assets,
+fund-of-funds). Changes follow [CONTRIBUTING.md](../../../CONTRIBUTING.md).

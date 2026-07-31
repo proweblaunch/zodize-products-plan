@@ -38,8 +38,8 @@ Retail (grocery, convenience, specialty), hospitality/food service
 
 | Capability | Comparable to | Zodize differentiation |
 |---|---|---|
-| Restaurant POS | Toast, Square for Restaurants | Same tenant/inventory backbone as [ZodiCommerce](../ZodiCommerce/SPEC.md), no separate online/in-store inventory system |
-| Retail POS | Square, Lightspeed Retail | Native multi-location rollup reporting via ZodiCore tenancy, not a per-store license silo |
+| Restaurant POS | Toast, Square for Restaurants | Built from the same base codebase and inventory engine as [ZodiCommerce](../ZodiCommerce/SPEC.md), so a merchant running both never maintains a separate online/in-store inventory system |
+| Retail POS | Square, Lightspeed Retail | Native multi-location rollup reporting via the product's own company/branch model, not a per-store license silo |
 | Offline-first checkout | Square (offline mode), Clover | Full transaction queue with conflict-safe sync, not a degraded-feature offline mode |
 | Till/cash management | Toast cash management, Loyverse | Till reconciliation ledger shares the same audit/accounting model as [ZodiBusiness](../ZodiBusiness/SPEC.md) |
 | Hardware ecosystem | Clover hardware ecosystem | Vendor-neutral hardware abstraction layer (§22) instead of locking merchants into proprietary terminals |
@@ -117,8 +117,10 @@ Retail (grocery, convenience, specialty), hospitality/food service
   option, configurable receipt template.
 - Barcode scanning: camera-based and dedicated hardware scanner support,
   SKU/UPC lookup against the shared catalog.
-- Shift/employee clock-in: time clock tied to the employee's ZodiCore
-  identity, shift-level sales attribution, break tracking.
+- Shift/employee clock-in: time clock tied to the employee's own admin-panel
+  user account (the base engine's `admin` guard, per
+  [admin-template.md](../../templates/admin-template.md)), shift-level sales
+  attribution, break tracking.
 - Hardware integration as an architecture concern (§11, §22): card readers,
   receipt printers, barcode scanners, cash drawers, customer-facing displays.
 - Second-layer baseline per
@@ -145,28 +147,59 @@ ZodiPOS-specific additions:
 
 ## 11. Architecture
 
-ZodiPOS is a tenant application on [ZodiCore](../ZodiCore/SPEC.md),
-consuming identity, permissions, and notifications via the shared Composer
-packages per [architecture/overview.md](../../architecture/overview.md), and
-shares its product catalog and inventory ledger with
-[ZodiCommerce](../ZodiCommerce/SPEC.md) so an item sold in-store and an item
-sold online decrement the same stock. The register client is a local-first
-PWA: it holds a synced copy of the active catalog, price list, and tax rules
-in local storage/IndexedDB, and every transaction is written locally first,
-then queued for sync via an idempotent transaction API keyed on a
-client-generated UUID — the same offline-sync pattern used by
-[ZodiTrack](../ZodiTrack/SPEC.md)'s mobile scanning client. A local
-lightweight sync daemon on multi-register locations (or the register client
-itself for single-register sites) manages the queue and conflict resolution,
-surfacing unresolved conflicts to the Store Manager rather than
-auto-resolving silently.
+ZodiPOS — the third product in the build order
+([ROADMAP.md](../../../ROADMAP.md)), chosen to prove the offline-first and
+hardware-integration patterns on top of the same pipeline validated by
+[ZodiBusiness](../ZodiBusiness/SPEC.md) and
+[ZodiCommerce](../ZodiCommerce/SPEC.md) — is built by cloning the sanitized
+base codebase and running the
+[genericization checklist](../../architecture/product-genericization-checklist.md):
+the banking-specific `loans`/`dps`/`fdr`/`branches`/`branch_staff`/
+`other_banks`/`beneficiaries`/`airtime` tables are stripped, and the
+`branch_staff` guard is dropped by default. ZodiPOS inherits the base
+engine's wallet/ledger (used for gift-card/store-credit tenders), payment
+gateways (§22), RBAC/auth, i18n, and admin configuration surface unmodified
+— see
+[base-codebase-strategy.md](../../architecture/base-codebase-strategy.md) —
+and layers its own Register, Offline Sync, Payments, Till Management,
+Employees, Receipts, and Hardware modules (§13) on top. There is no shared
+tenant boundary and no ZodiCore platform dependency: each ZodiPOS deployment
+is one merchant's standalone, self-hosted instance, per
+[single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md).
+
+ZodiPOS and [ZodiCommerce](../ZodiCommerce/SPEC.md) are independently
+deployed products, each cloned from the same base codebase and sharing the
+same catalog/inventory-ledger *design*, but not a runtime or database — a
+merchant running both installs them as two separate codebases on their own
+hosting and connects them via an API-based inventory-sync integration (the
+same class of integration documented for ZodiCommerce's channel connectors,
+§22 of [ZodiCommerce's spec](../ZodiCommerce/SPEC.md#22-integrations)) so an
+item sold in-store and an item sold online reconcile against one
+merchant-controlled stock truth without either product depending on the
+other being reachable at runtime. The register client is a local-first PWA,
+built as part of this same product's codebase: it holds a synced copy of the
+active catalog, price list, and tax rules in local storage/IndexedDB, and
+every transaction is written locally first, then queued for sync via an
+idempotent transaction API keyed on a client-generated UUID — the same
+offline-sync pattern used by [ZodiTrack](../ZodiTrack/SPEC.md)'s own,
+independently deployed mobile scanning client. A local lightweight sync
+daemon on multi-register locations (or the register client itself for
+single-register sites) manages the queue and conflict resolution, surfacing
+unresolved conflicts to the Store Manager rather than auto-resolving
+silently. Multi-location merchants use the `company_id`/`location_id`
+scoping in §14, per
+[localization-i18n.md](../../standards/localization-i18n.md#multi-company--multi-branch-data-scoping) —
+this is scoping within one deployment, not tenancy.
 
 ## 12. Technology
 
-Laravel (PHP) + Vue per
-[coding-standards-php-laravel.md](../../development/coding-standards-php-laravel.md)
-and [coding-standards-vue.md](../../development/coding-standards-vue.md);
-PostgreSQL + Redis per
+Laravel (PHP) per the base codebase's stack (Laravel 11, PHP ^8.3, Vite 5) —
+see
+[base-codebase-strategy.md](../../architecture/base-codebase-strategy.md) —
+following
+[coding-standards-php-laravel.md](../../development/coding-standards-php-laravel.md);
+MySQL/MariaDB + Redis (where the buyer's hosting supports it, with a file/DB
+cache fallback) per
 [database-standards.md](../../development/database-standards.md); a PWA
 register client with IndexedDB-backed local storage and a service worker for
 offline asset/catalog caching; a hardware abstraction layer (`HardwareDriverContract`)
@@ -190,17 +223,25 @@ rather than vendor-specific code paths scattered through the checkout flow.
 
 | Entity | Key columns |
 |---|---|
-| `registers` | id, tenant_id, location_id, name, hardware_profile_id |
+| `companies` | id, name, default_currency, is_active |
+| `locations` | id, company_id, name, address, is_active |
+| `registers` | id, location_id, name, hardware_profile_id |
 | `till_sessions` | id, register_id, opened_by, opening_float, closed_by, closing_counted, variance |
-| `pos_transactions` | id, tenant_id, register_id, till_session_id, client_uuid, status, total, synced_at |
+| `pos_transactions` | id, location_id, register_id, till_session_id, client_uuid, status, total, synced_at |
 | `pos_transaction_items` | id, transaction_id, variant_id, quantity, unit_price, discount_amount |
 | `pos_tenders` | id, transaction_id, tender_type (cash/card/gift_card/custom), amount, gateway_reference |
 | `till_movements` | id, till_session_id, type (paid_in/paid_out), amount, reason, recorded_by |
-| `employee_shifts` | id, tenant_id, user_id, clocked_in_at, clocked_out_at, register_id |
-| `hardware_profiles` | id, tenant_id, location_id, printer_config, reader_config, scanner_config |
+| `employee_shifts` | id, user_id, clocked_in_at, clocked_out_at, register_id |
+| `hardware_profiles` | id, location_id, printer_config, reader_config, scanner_config |
 | `sync_conflicts` | id, transaction_id, conflict_type, detected_at, resolved_by, resolution |
-| `gift_cards` | id, tenant_id, code, balance, issued_at, last_used_at |
+| `gift_cards` | id, code, balance, issued_at, last_used_at |
 | `voids_refunds` | id, transaction_id, type, amount, approved_by, reason |
+
+`companies` and `locations` model the multi-brand/multi-location scoping a
+merchant may need within its one deployment (§11), per
+[localization-i18n.md](../../standards/localization-i18n.md#multi-company--multi-branch-data-scoping);
+a single-location merchant has exactly one seeded `companies` row and one
+`locations` row.
 
 ## 15. Key API Endpoints
 
@@ -247,18 +288,25 @@ All channels follow
 
 ## 18. Permissions & Roles
 
-Extends ZodiCore's default roles
-([rbac-permissions.md](../../security/rbac-permissions.md#default-system-roles))
-with: `register.operate`, `till.open`, `till.close`, `till.approve_variance`,
+Built on the base engine's inherited `Role`/`Permission` RBAC (not Spatie),
+per
+[admin-template.md](../../templates/admin-template.md#roles--permissions-inherited-not-spatie).
+ZodiPOS's `DemoSeeder` ships its own default admin roles — Multi-Location
+Operator, Store/Restaurant Manager, Shift Supervisor, and Cashier/Server —
+each granted a subset of ZodiPOS's product-specific permissions:
+`register.operate`, `till.open`, `till.close`, `till.approve_variance`,
 `transactions.void`, `transactions.refund`, `price.override`,
 `sync_conflicts.resolve`. `transactions.void` and `price.override` require
 Shift Supervisor or above by default; a Cashier can request either action
-but it routes through the approval chain in §19.
+but it routes through the approval chain in §19. A merchant can create
+additional custom roles and reassign any permission from the admin panel
+with no code change, per
+[admin-configuration-baseline.md](../../standards/admin-configuration-baseline.md#roles--permissions).
 
 ## 19. Workflows & Approval Chains
 
-- **Void/refund approval**: a Cashier-initiated void or refund above a
-  tenant-configured amount requires Shift Supervisor approval, captured as
+- **Void/refund approval**: a Cashier-initiated void or refund above an
+  admin-configured amount requires Shift Supervisor approval, captured as
   a PIN/badge confirmation at the register before the transaction reverses.
 - **Till variance resolution**: a till closing with a cash variance beyond
   the configured tolerance cannot fully close without Shift Supervisor
@@ -274,7 +322,7 @@ but it routes through the approval chain in §19.
 ## 20. Audit Logs
 
 Every transaction, void, refund, price override, till open/close, paid-in/
-paid-out, and sync conflict resolution is recorded to ZodiCore's shared
+paid-out, and sync conflict resolution is recorded to this deployment's own
 audit log with actor, register, till session, and before/after amounts, per
 [audit-logging.md](../../security/audit-logging.md). Because register
 actions often happen under a shared physical device, every action is tied
@@ -301,9 +349,14 @@ Dashboard-builder and scheduled-report capability per
   camera-based scanning as a hardware-free fallback.
 - **Cash drawers**: standard RJ11/USB-triggered drawer integration via the
   connected receipt printer or a dedicated controller.
-- **Payment gateways**: the same `PaymentGatewayContract` abstraction from
-  [ZodiCore §20](../ZodiCore/SPEC.md#20-payment-gateways-wallet-accounting-taxes-invoices),
-  extended with offline-authorization support where the gateway provides it.
+- **Payment gateways**: the inherited gateway catalog documented in
+  [payment-gateways.md](../../standards/payment-gateways.md) — Stripe and
+  Authorize.Net for card processing, Flutterwave and Paystack for merchants
+  in Zodize's primary African market, plus Mollie/Razorpay for
+  region-specific merchants — accessed through the same `HardwareDriverContract`-adjacent
+  card-reader integration above, extended with offline-authorization support
+  where the reader/gateway combination provides it, and the native
+  manual/offline gateway as an always-available fallback tender.
 
 ## 23. AI Features
 
@@ -327,7 +380,7 @@ Dashboard-builder and scheduled-report capability per
 
 ## 25. Seed/Demo Data
 
-`DemoSeeder` provisions a demo tenant with 3 locations (one retail, one
+`DemoSeeder` provisions a demo deployment with 3 locations (one retail, one
 quick-service restaurant, one cafe), each with 2 registers, 30 days of
 transaction history including split-tender sales, at least one voided
 transaction, at least one till with a resolved variance, and one simulated
@@ -350,8 +403,8 @@ tokenization happens at the reader/gateway per
 [data-protection-privacy.md](../../security/data-protection-privacy.md), and
 the register client's local storage holds only catalog/price/transaction
 metadata, never raw card data, even transiently. Employee register access
-uses short-lived PIN/badge sessions distinct from the full ZodiCore web
-login, scoped to register operation only.
+uses short-lived PIN/badge sessions distinct from the product's own full
+admin-panel login, scoped to register operation only.
 
 ## 28. Testing Requirements
 
@@ -421,9 +474,13 @@ or vendor-certified simulator hardware before go-live.
 
 ## Roadmap (spec depth)
 
-This spec is Foundation-depth. Queued for Deep-depth expansion: a full ER
-diagram covering hardware-profile configuration and settlement-batch
-reconciliation tables, the complete endpoint catalog (hardware pairing,
-receipt template management endpoints), and a dedicated
-`DATA_MODEL.md`/`API_REFERENCE.md` pair matching
+This spec is Foundation-depth. Its Architecture and Core Data Model sections
+were revised to the standalone, self-hosted, single-tenant base-codebase
+model described in
+[architecture/overview.md](../../architecture/overview.md) and
+[single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md).
+Queued for Deep-depth expansion: a full ER diagram covering hardware-profile
+configuration and settlement-batch reconciliation tables, the complete
+endpoint catalog (hardware pairing, receipt template management endpoints),
+and a dedicated `DATA_MODEL.md`/`API_REFERENCE.md` pair matching
 [ZodiCore](../ZodiCore/SPEC.md)'s companion-document structure.

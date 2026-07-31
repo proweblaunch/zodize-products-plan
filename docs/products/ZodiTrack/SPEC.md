@@ -39,7 +39,7 @@ equipment), and light manufacturing tooling.
 
 | Capability | Comparable to | Zodize differentiation |
 |---|---|---|
-| Asset tracking/tagging | Asset Panda, EZOfficeInventory | Native ZodiCore RBAC/audit and shared design system instead of a standalone SaaS silo |
+| Asset tracking/tagging | Asset Panda, EZOfficeInventory | Self-hosted deployment with the base engine's own RBAC/audit and the shared Zodize design system built in, instead of a standalone SaaS silo |
 | IT asset management | Snipe-IT, ServiceNow ITAM | Cross-industry asset model (not IT-only), with the same rigor extended to facilities/field equipment |
 | Maintenance scheduling | UpKeep, Fiix (CMMS) | Maintenance scheduling is one module of the same asset record, not a separate CMMS system to reconcile |
 | Check-in/check-out for shared equipment | Booqable | Same permission model and audit trail as every other Zodize product, no separate login |
@@ -134,7 +134,7 @@ ZodiTrack-specific additions:
 - Mobile scan-to-lookup response time: p95 < 500ms including barcode decode,
   since technicians scan in the field and expect near-instant feedback.
 - Asset registry search/filter must remain performant at 500,000+ assets per
-  tenant via indexed category/location/status filters, not client-side
+  deployment via indexed category/location/status filters, not client-side
   filtering.
 - Offline-tolerant mobile scanning: scans captured with no connectivity
   queue locally and sync once connectivity resumes (see
@@ -143,23 +143,48 @@ ZodiTrack-specific additions:
 
 ## 11. Architecture
 
-ZodiTrack is a tenant application on [ZodiCore](../ZodiCore/SPEC.md),
-consuming identity, permissions, notifications, and audit via the shared
-Composer packages per [architecture/overview.md](../../architecture/overview.md).
-The mobile scanning experience is a lightweight PWA client that queues scan
-transactions in local storage and syncs via an idempotent transaction API
-(each queued scan carries a client-generated UUID so a retried sync never
-double-applies), following the same offline-first design principle used in
-[ZodiPOS](../ZodiPOS/SPEC.md). Location hierarchy and asset transfer state
-are modeled as an append-only ledger (mirroring ZodiBusiness's journal
-pattern) so an asset's full custody history is always reconstructable.
+ZodiTrack is built by cloning the sanitized base codebase and running the
+[genericization checklist](../../architecture/product-genericization-checklist.md):
+the banking-specific `loans`/`dps`/`fdr`/`branches`/`branch_staff`/
+`other_banks`/`beneficiaries`/`airtime` tables are stripped, since none of
+them serve an asset-tracking product, and the `branch_staff` guard is
+dropped by default. ZodiTrack inherits the base engine's RBAC/auth, i18n,
+and admin configuration surface unmodified — see
+[base-codebase-strategy.md](../../architecture/base-codebase-strategy.md) —
+and layers its own Asset Registry, Locations, Check-In/Check-Out,
+Maintenance, Financial, Audit, and Consumables modules (§13) on top, per
+[base-codebase-strategy.md](../../architecture/base-codebase-strategy.md#layering-a-products-domain-modules-onto-the-sanitized-base).
+There is no shared tenant boundary and no ZodiCore platform dependency: each
+ZodiTrack deployment is one organization's standalone, self-hosted instance,
+per
+[single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md).
+
+The mobile scanning experience is a lightweight PWA client, built as part of
+this same product's codebase, that queues scan transactions in local storage
+and syncs via an idempotent transaction API (each queued scan carries a
+client-generated UUID so a retried sync never double-applies), following the
+same offline-first design principle used in [ZodiPOS](../ZodiPOS/SPEC.md)'s
+own, independently deployed register client. Location hierarchy and asset
+transfer state are modeled as an append-only ledger — mirroring the
+inherited wallet engine's own append-only `Transaction` pattern (see
+[wallet-system.md](../../standards/wallet-system.md)) — so an asset's full
+custody history is always reconstructable within this one deployment's
+database. Organizations tracking assets across multiple sites use the
+`locations` hierarchy in §14 for that scoping; a multi-legal-entity
+organization additionally uses the `company_id`-scoped multi-company model
+per
+[localization-i18n.md](../../standards/localization-i18n.md#multi-company--multi-branch-data-scoping) —
+this is scoping within one deployment, not tenancy.
 
 ## 12. Technology
 
-Laravel (PHP) + Vue per
-[coding-standards-php-laravel.md](../../development/coding-standards-php-laravel.md)
-and [coding-standards-vue.md](../../development/coding-standards-vue.md);
-PostgreSQL + Redis per
+Laravel (PHP) per the base codebase's stack (Laravel 11, PHP ^8.3, Vite 5) —
+see
+[base-codebase-strategy.md](../../architecture/base-codebase-strategy.md) —
+following
+[coding-standards-php-laravel.md](../../development/coding-standards-php-laravel.md);
+MySQL/MariaDB + Redis (where the buyer's hosting supports it, with a file/DB
+cache fallback) per
 [database-standards.md](../../development/database-standards.md); a PWA
 mobile client with a local IndexedDB queue for offline scan capture;
 QR/Code128 barcode generation via a standard open-source library, decoded
@@ -181,9 +206,10 @@ client-side via the device camera or a paired Bluetooth/USB scanner.
 
 | Entity | Key columns |
 |---|---|
-| `assets` | id, tenant_id, tag_code, category_id, status, current_location_id, current_custodian_id |
-| `asset_categories` | id, tenant_id, name, depreciation_method, default_useful_life_months |
-| `locations` | id, tenant_id, parent_location_id, name, type (site/building/room) |
+| `companies` | id, name, default_currency, is_active |
+| `assets` | id, company_id, tag_code, category_id, status, current_location_id, current_custodian_id |
+| `asset_categories` | id, company_id, name, depreciation_method, default_useful_life_months |
+| `locations` | id, company_id, parent_location_id, name, type (site/building/room) |
 | `asset_transfers` | id, asset_id, from_location_id, to_location_id, requested_by, approved_by, status |
 | `checkouts` | id, asset_id, checked_out_to, due_back_at, checked_in_at, condition_out, condition_in |
 | `maintenance_schedules` | id, asset_id, trigger_type (time/usage), interval_value, next_due_at |
@@ -191,9 +217,17 @@ client-side via the device camera or a paired Bluetooth/USB scanner.
 | `work_order_parts` | id, work_order_id, part_id, quantity, cost |
 | `condition_logs` | id, asset_id, recorded_at, rating, photo_url, note |
 | `depreciation_schedules` | id, asset_id, method, monthly_amount, book_value, as_of_date |
-| `spare_parts` | id, tenant_id, sku, name, quantity_on_hand, reorder_point |
-| `cycle_counts` | id, tenant_id, location_id, performed_by, started_at, completed_at |
+| `spare_parts` | id, company_id, sku, name, quantity_on_hand, reorder_point |
+| `cycle_counts` | id, company_id, location_id, performed_by, started_at, completed_at |
 | `cycle_count_discrepancies` | id, cycle_count_id, asset_id, expected, actual, resolution |
+
+`companies` is optional multi-legal-entity scoping within this one
+organization's single deployment (e.g. a holding company tracking assets
+across separately-booked subsidiaries), per
+[localization-i18n.md](../../standards/localization-i18n.md#multi-company--multi-branch-data-scoping);
+an organization with one legal entity has exactly one seeded `companies`
+row. Multi-site scoping within a company uses the `locations` hierarchy
+(site → building → room) above, not a separate scoping column.
 
 ## 15. Key API Endpoints
 
@@ -242,21 +276,28 @@ All channels follow
 
 ## 18. Permissions & Roles
 
-Extends ZodiCore's default roles
-([rbac-permissions.md](../../security/rbac-permissions.md#default-system-roles))
-with: `assets.manage`, `assets.transfer`, `transfers.approve`,
+Built on the base engine's inherited `Role`/`Permission` RBAC (not Spatie),
+per
+[admin-template.md](../../templates/admin-template.md#roles--permissions-inherited-not-spatie).
+ZodiTrack's `DemoSeeder` ships its own default admin roles — Asset Manager,
+Facilities/Field Technician, Maintenance Coordinator, and Location/Site
+Manager — each granted a subset of ZodiTrack's product-specific permissions:
+`assets.manage`, `assets.transfer`, `transfers.approve`,
 `checkouts.manage`, `work_orders.manage`, `assets.dispose`,
 `cycle_counts.perform`, `cycle_counts.resolve`. `assets.dispose` (write-off)
-is restricted to `Manager` and above so a Field Technician cannot retire an
-asset unilaterally.
+is restricted to `Asset Manager` and above so a Field Technician cannot
+retire an asset unilaterally. An organization can create additional custom
+roles and reassign any permission from the admin panel with no code change,
+per
+[admin-configuration-baseline.md](../../standards/admin-configuration-baseline.md#roles--permissions).
 
 ## 19. Workflows & Approval Chains
 
 - **Transfer approval**: a transfer is not final until the destination
   location's Site Manager approves receipt; until then the asset shows as
   `in_transit`, not yet assigned to the destination.
-- **Disposal approval**: disposing/writing off an asset above a
-  tenant-configured value threshold requires a second approval from Asset
+- **Disposal approval**: disposing/writing off an asset above an
+  admin-configured value threshold requires a second approval from Asset
   Manager or Finance, since it affects the depreciation schedule and book
   value reporting.
 - **Discrepancy resolution**: a cycle-count discrepancy (missing/misplaced
@@ -266,8 +307,8 @@ asset unilaterally.
 ## 20. Audit Logs
 
 Every transfer, check-in/check-out, condition log entry, maintenance work
-order, disposal, and cycle-count discrepancy resolution is recorded to
-ZodiCore's shared audit log with actor, timestamp, and before/after state,
+order, disposal, and cycle-count discrepancy resolution is recorded to this
+deployment's own audit log with actor, timestamp, and before/after state,
 per [audit-logging.md](../../security/audit-logging.md). An asset's detail
 page surfaces its full timeline (registration → transfers → checkouts →
 maintenance → disposal) as a first-class activity feed, not just a raw log
@@ -313,7 +354,7 @@ capability per [dashboard-standards.md](../../standards/dashboard-standards.md).
 
 ## 25. Seed/Demo Data
 
-`DemoSeeder` provisions a demo tenant with 4 locations in a 2-level
+`DemoSeeder` provisions a demo deployment with 4 locations in a 2-level
 hierarchy, 300 seeded assets across 6 categories with realistic
 purchase/depreciation data, a mix of checked-out and available shared
 assets, 12 months of maintenance work order history, and one completed
@@ -332,9 +373,9 @@ count being marked complete.
 Full baseline from
 [security-standards.md](../../security/security-standards.md) applies.
 Asset custody data (who currently holds what) is treated as
-access-sensitive within the tenant — location-scoped roles only see assets
-within their assigned locations by default, per
-[rbac-permissions.md](../../security/rbac-permissions.md).
+access-sensitive within this one deployment — location-scoped roles only see
+assets within their assigned locations by default, per the RBAC model in
+§18.
 
 ## 28. Testing Requirements
 
@@ -401,9 +442,13 @@ go-live.
 
 ## Roadmap (spec depth)
 
-This spec is Foundation-depth. Queued for Deep-depth expansion: a full ER
-diagram covering multi-hierarchy location trees and lot-tracked spare-parts
-tables, the complete endpoint catalog (bulk transfer, label-template
-management endpoints), and a dedicated `DATA_MODEL.md`/`API_REFERENCE.md`
-pair matching [ZodiCore](../ZodiCore/SPEC.md)'s companion-document
-structure.
+This spec is Foundation-depth. Its Architecture and Core Data Model sections
+were revised to the standalone, self-hosted, single-tenant base-codebase
+model described in
+[architecture/overview.md](../../architecture/overview.md) and
+[single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md).
+Queued for Deep-depth expansion: a full ER diagram covering multi-hierarchy
+location trees and lot-tracked spare-parts tables, the complete endpoint
+catalog (bulk transfer, label-template management endpoints), and a
+dedicated `DATA_MODEL.md`/`API_REFERENCE.md` pair matching
+[ZodiCore](../ZodiCore/SPEC.md)'s companion-document structure.
