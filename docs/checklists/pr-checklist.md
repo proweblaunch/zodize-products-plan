@@ -27,7 +27,7 @@ skipping it.
 
 ## Code quality
 
-- [ ] Code follows [`../development/coding-standards.md`](../development/coding-standards.md)
+- [ ] Code follows [`../development/coding-standards-php-laravel.md`](../development/coding-standards-php-laravel.md) and [`../development/coding-standards-vue.md`](../development/coding-standards-vue.md)
       (Laravel and Vue conventions).
 - [ ] New modules follow the directory structure and layer responsibilities
       in [`../templates/module-template.md`](../templates/module-template.md).

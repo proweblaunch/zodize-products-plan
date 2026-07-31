@@ -52,7 +52,7 @@ deltas, not a re-derivation.
 
 ## Phase 4 — Product Specifications
 
-**Status: In progress — ZodiCore complete as reference; remaining 19 drafted at
+**Status: Drafted — ZodiCore complete as reference; remaining 19 complete at
 foundation depth, queued for deep expansion**
 
 `ZodiCore` is the reference-depth product specification: every section in

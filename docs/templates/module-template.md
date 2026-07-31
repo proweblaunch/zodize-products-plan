@@ -85,7 +85,7 @@ exactly one of them — never duplicated across layers:
   action, per [`../development/api-standards.md`](../development/api-standards.md).
 - **Services** — business logic and orchestration. This is where workflows
   spanning multiple models/repositories live. Services MUST use constructor
-  injection per [`../development/coding-standards.md`](../development/coding-standards.md).
+  injection per [`../development/coding-standards-php-laravel.md`](../development/coding-standards-php-laravel.md).
 - **Repositories** — data access abstraction implementing a
   `{Entity}RepositoryInterface`. Required whenever a query is non-trivial or
   reused across more than one Service; simple CRUD-only modules MAY skip the

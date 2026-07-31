@@ -41,7 +41,7 @@ mandatory sub-gate of
 - [ ] All data in transit is encrypted (TLS) with no mixed-content or
       HTTP-accessible endpoints.
 - [ ] Sensitive data at rest (MFA secrets, webhook secrets, API tokens) is
-      encrypted per [`../security/data-protection.md`](../security/data-protection.md).
+      encrypted per [`../security/data-protection-privacy.md`](../security/data-protection-privacy.md).
 - [ ] No raw API tokens, passwords, or secrets are logged, ever, at any log
       level.
 - [ ] Personally identifiable information is excluded from analytics event
