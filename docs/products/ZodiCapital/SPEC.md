@@ -1,0 +1,487 @@
+# ZodiCapital — Product Specification
+
+> Status: **Foundation**. Vision, market, personas, architecture, modules,
+> core data model, key workflows, integrations, permissions model, and
+> acceptance criteria are complete and implementation-usable. Deep artifacts
+> (full ER diagrams, exhaustive endpoint listings, full report catalogs) are
+> queued — see [Roadmap (spec depth)](#roadmap-spec-depth) at the bottom of
+> this document. See [PRODUCT_CATALOG.md](../../../PRODUCT_CATALOG.md) for
+> spec status definitions.
+
+Built on [ZodiCore](../ZodiCore/SPEC.md) — ZodiCapital does not reimplement
+identity, tenancy, billing, notifications, RBAC, plugins, or audit logging;
+it consumes those services and adds fund-management-domain modules on top.
+
+## 1. Vision
+
+ZodiCapital is fund and investment portfolio management for private equity,
+venture capital, and real asset fund managers who need real LP/GP fund
+mechanics — capital calls, distributions, NAV, and IRR — not a generic CRM
+repurposed as a fund back office. It gives a fund manager the fund
+administration and investor relations infrastructure to run a fund's full
+lifecycle from formation to wind-down on one platform.
+
+## 2. Purpose
+
+Fund managers today stitch together a fund administrator's portal, a
+separate investor-relations CRM, a spreadsheet-based capital-call and
+distribution waterfall, and a manually assembled quarterly reporting
+package. ZodiCapital exists to give a fund manager one coherent system —
+fund structure, capital accounts, calls/distributions, NAV, performance
+reporting, and an investor portal — built on ZodiCore's identity and audit
+backbone, so LPs get a real self-service portal and the GP gets a real
+system of record instead of a reconciled spreadsheet.
+
+## 3. Target Market
+
+Private equity and venture capital fund managers, real asset (real estate,
+infrastructure) fund sponsors, fund-of-funds managers, and family offices
+running SPV or co-investment vehicles. Buyers are typically a Fund
+Controller/CFO, Head of Investor Relations, or a fund manager's COO
+evaluating a build-vs-buy decision against a fund administrator's portal or
+an in-house spreadsheet process.
+
+## 4. Industries
+
+Asset management, private equity, venture capital, real assets/real estate
+funds.
+
+## 5. Competitor Analysis
+
+| Capability | Comparable to | Zodize differentiation |
+|---|---|---|
+| Fund administration platform | Carta (fund admin), Allvue Systems, eFront | Ships with tenant/RBAC/audit already built via ZodiCore, faster to stand up compliant fund operations |
+| Investor portal/CRM | Juniper Square, Dynamo Software | Investor portal shares one identity and permission model with fund accounting, not a separate synced system |
+| Capital call/distribution workflow | Anduin, Carta subscription workflows | Capital calls, distributions, and NAV share one ledger of record with the investor portal |
+| Performance reporting (IRR/MOIC) | PitchBook fund reporting tools, Preqin-adjacent analytics | Performance metrics computed directly from the cash-flow ledger, not a reconciled downstream export |
+| Subscription/e-signature workflow | DocuSign + Carta workflow combination, AngelList fund tooling | E-signature and accredited-investor verification integrated into one onboarding flow, not stitched across vendors |
+
+## 6. Personas
+
+- **Fund Controller/CFO** — manages fund accounting, capital calls,
+  distributions, and NAV calculation.
+- **Head of Investor Relations** — manages LP communications, the investor
+  portal, and subscription onboarding.
+- **General Partner (GP)/Fund Manager** — reviews fund performance,
+  approves capital calls and distributions.
+- **Limited Partner (LP)/Investor** — views capital account statements,
+  performance reporting, and responds to capital calls via the investor
+  portal.
+- **Compliance Officer** — manages accredited-investor verification and
+  regulatory filings.
+- **Zodize Support/Ops** — as defined in [ZodiCore §6](../ZodiCore/SPEC.md#6-personas).
+
+## 7. User Journeys
+
+1. **Fund formation and investor onboarding**: GP creates a fund structure
+   (LP/GP entity, commitment terms, fee/carry structure) → prospective LP
+   is invited to the investor portal → LP completes subscription documents
+   and accredited-investor verification (see §21) → e-signature workflow
+   completes → LP's capital commitment is recorded and a capital account is
+   created.
+2. **Capital call**: Fund Controller initiates a capital call for a
+   percentage of committed capital → the system calculates each LP's pro-
+   rata call amount based on commitment percentage → GP approves the call
+   → call notices are sent to LPs via the investor portal and notification
+   channels → LP wire instructions and due dates are tracked until funded,
+   with unfunded calls flagged for follow-up.
+3. **Distribution and waterfall**: fund realizes an exit → Fund Controller
+   models the distribution through the fund's configured waterfall (return
+   of capital, preferred return, GP catch-up, carried interest split) →
+   GP approves the distribution → per-LP distribution amounts are
+   calculated and disbursed → each LP's capital account and cumulative
+   distribution history update.
+4. **Quarterly NAV and performance reporting**: Fund Controller runs the
+   quarterly NAV calculation based on portfolio company valuations and cash
+   position → IRR and MOIC are recalculated at the fund and per-LP level →
+   the quarterly report package is generated and published to the investor
+   portal, with LPs notified their statement is available.
+5. **Accredited-investor re-verification**: as part of periodic compliance
+   review, Compliance Officer triggers re-verification for LPs whose
+   accreditation documentation is approaching expiry → LPs are prompted via
+   the portal to re-submit → non-response beyond a configured grace period
+   flags the LP's account for GP review.
+
+## 8. Business Goals
+
+- Let a fund manager run capital calls, distributions, and NAV reporting on
+  one system of record instead of reconciling spreadsheets against a fund
+  administrator's exports.
+- Give LPs a real self-service portal for capital account statements and
+  performance reporting, reducing IR team email volume.
+- Reduce time-to-close for new fund formations by integrating subscription
+  documents, e-signature, and accredited-investor verification into one
+  onboarding flow.
+
+## 9. Functional Requirements
+
+- Fund structures: LP/GP entity modeling, commitment tracking, fee
+  structure (management fee, hurdle rate) and carried-interest/waterfall
+  configuration, support for multiple funds and co-investment vehicles per
+  tenant.
+- Capital calls: pro-rata call calculation, call notice generation and
+  delivery, funding status tracking, late-payment handling.
+- Distributions: waterfall modeling (return of capital, preferred return,
+  GP catch-up, carry split), per-LP distribution calculation and
+  disbursement tracking.
+- NAV calculation: portfolio company/asset valuation input, quarterly (or
+  configurable cadence) NAV computation at fund and per-LP capital-account
+  level.
+- Investor portal: LP self-service access to capital account statements,
+  documents, performance reporting, and capital call/distribution history.
+- Performance reporting: IRR and MOIC computed at fund and per-LP level,
+  both gross and net of fees/carry.
+- Compliance/accredited-investor verification: verification workflow at
+  subscription and periodic re-verification, with expiry tracking.
+- Subscription documents/e-signature workflow: templated subscription
+  agreement generation, e-signature capture, and document archival.
+- Full second-layer baseline per
+  [product-philosophy.md](../../development/product-philosophy.md#second-layer-feature-catalog):
+  approval chains (capital call/distribution approval), rule engine
+  (re-verification scheduling), saved filters and global search over
+  LPs/funds, custom fields on fund/LP records, full audit history, soft
+  delete with restore on non-ledger entities, mass actions (bulk call
+  notice send), import/export wizards for LP and commitment data, command
+  palette, scheduled/report-builder reporting, system health dashboard,
+  white-labeling of the investor portal.
+
+## 10. Non-Functional Requirements
+
+See [performance-standards.md](../../quality/performance-standards.md) and
+[security-standards.md](../../security/security-standards.md) for the
+inherited baseline. ZodiCapital-specific additions:
+
+- Capital call/distribution calculation for a fund with up to 500 LPs
+  completes in under 10 seconds, since GPs frequently run these
+  calculations interactively during approval review.
+- Investor portal document/statement load targets p95 < 1s, since LP trust
+  in the platform is heavily shaped by portal responsiveness during
+  reporting periods.
+- 99.9% uptime target for the investor portal, matching the general
+  product baseline (fund operations are not real-time-critical the way
+  banking/trading are).
+
+## 11. Architecture
+
+ZodiCapital is a Laravel application consuming ZodiCore's identity,
+tenancy, billing, notification, RBAC, plugin, and audit packages exactly as
+described in [ZodiCore §11](../ZodiCore/SPEC.md#11-architecture). It adds a
+`zodize/fund-accounting` domain package providing capital account ledger
+logic (calls, distributions, NAV) and a `zodize/investor-portal` package
+providing the LP-facing experience, both registering into ZodiCore's audit
+log and RBAC policy registry. The investor portal is modeled as a
+restricted-scope view of the same tenant data GPs manage, using ZodiCore's
+RBAC to scope each LP to only their own capital account and fund-level
+public documents, never another LP's data.
+
+## 12. Technology
+
+Laravel (PHP) + Vue per
+[coding-standards-php-laravel.md](../../development/coding-standards-php-laravel.md)
+and [coding-standards-vue.md](../../development/coding-standards-vue.md);
+PostgreSQL for fund/capital-account/waterfall records + Redis for
+performance-metric caching per
+[database-standards.md](../../development/database-standards.md);
+e-signature and accredited-investor verification integrated as
+provider-abstracted services (see §22).
+
+## 13. Modules & Submodules
+
+| Module | Submodules |
+|---|---|
+| Fund Structures | Entity Modeling, Commitment Tracking, Fee/Carry Configuration |
+| Capital Calls | Call Calculation, Notice Generation, Funding Status Tracking |
+| Distributions | Waterfall Modeling, Per-LP Calculation, Disbursement Tracking |
+| NAV & Valuation | Portfolio Valuation Input, NAV Calculation, Capital Account Rollforward |
+| Investor Portal | Statement Access, Document Library, Performance Reporting View |
+| Performance Reporting | IRR/MOIC Calculation, Fund/LP-Level Analytics, Benchmark Comparison |
+| Compliance | Accredited-Investor Verification, Re-Verification Scheduling, Filing Tracking |
+| Subscription & E-Signature | Document Templates, E-Signature Capture, Document Archival |
+
+## 14. Core Data Model
+
+The 11 entities below are the load-bearing core; full ER diagram is queued
+(see [Roadmap (spec depth)](#roadmap-spec-depth)).
+
+| Entity | Key columns |
+|---|---|
+| `funds` | id, tenant_id, name, vintage_year, target_size, fee_structure_json, waterfall_config_json |
+| `investors` | id, tenant_id, legal_name, investor_type, accreditation_status, accreditation_expires_at |
+| `commitments` | id, fund_id, investor_id, committed_amount, commitment_date, status |
+| `capital_accounts` | id, commitment_id, called_to_date, distributed_to_date, current_nav, updated_at |
+| `capital_calls` | id, fund_id, call_number, total_call_amount, due_date, status, approved_by |
+| `capital_call_allocations` | id, capital_call_id, commitment_id, amount_due, amount_funded, funded_at |
+| `distributions` | id, fund_id, distribution_number, total_amount, waterfall_tier, approved_by |
+| `distribution_allocations` | id, distribution_id, commitment_id, amount, disbursed_at |
+| `nav_valuations` | id, fund_id, valuation_date, nav_amount, methodology, approved_by |
+| `subscription_documents` | id, commitment_id, document_id, esignature_status, signed_at |
+| `performance_snapshots` | id, fund_id, as_of_date, irr, moic, dpi, tvpi |
+
+## 15. Key API Endpoints
+
+The endpoints below are the primary implementation surface; the full
+catalog is queued (see [Roadmap (spec depth)](#roadmap-spec-depth)). All
+conform to [api-standards.md](../../development/api-standards.md) and
+[rest-standards.md](../../development/rest-standards.md).
+
+| Method | Path | Purpose |
+|---|---|---|
+| POST | `/api/v1/funds` | Create a fund structure |
+| POST | `/api/v1/funds/{id}/commitments` | Record an investor commitment |
+| GET | `/api/v1/investors/{id}/capital-account` | Fetch an investor's capital account |
+| POST | `/api/v1/funds/{id}/capital-calls` | Initiate a capital call |
+| POST | `/api/v1/capital-calls/{id}/approve` | Approve a pending capital call |
+| POST | `/api/v1/capital-calls/{id}/allocations/{allocation_id}/mark-funded` | Record LP funding |
+| POST | `/api/v1/funds/{id}/distributions` | Model and initiate a distribution |
+| POST | `/api/v1/distributions/{id}/approve` | Approve a pending distribution |
+| POST | `/api/v1/funds/{id}/nav-valuations` | Record a NAV valuation |
+| GET | `/api/v1/funds/{id}/performance` | Fetch fund-level IRR/MOIC/DPI/TVPI |
+| GET | `/api/v1/investors/{id}/performance` | Fetch per-LP performance metrics |
+| POST | `/api/v1/investors/{id}/verify-accreditation` | Trigger accreditation verification |
+| GET | `/api/v1/investors/{id}/documents` | List an LP's documents |
+| POST | `/api/v1/subscription-documents/{id}/send-for-signature` | Send subscription doc for e-signature |
+| GET | `/api/v1/subscription-documents/{id}/status` | Check e-signature status |
+| GET | `/api/v1/funds/{id}/capital-calls` | List capital call history |
+| GET | `/api/v1/funds/{id}/distributions` | List distribution history |
+| GET | `/api/v1/reports/quarterly-package/{fund_id}` | Generate quarterly report package |
+| GET | `/api/v1/portal/statements` | LP-scoped: fetch own capital account statements |
+| GET | `/api/v1/portal/documents` | LP-scoped: fetch own document library |
+
+## 16. Events
+
+Domain events registered on ZodiCore's event bus (see
+[caching-queues-events.md](../../architecture/caching-queues-events.md)):
+`fund.created`, `commitment.recorded`, `capital_call.initiated`,
+`capital_call.approved`, `capital_call.funded`, `capital_call.overdue`,
+`distribution.initiated`, `distribution.approved`, `distribution.disbursed`,
+`nav_valuation.recorded`, `accreditation.verified`,
+`accreditation.expiring`, `accreditation.expired`,
+`subscription_document.signed`, `quarterly_package.published`.
+
+## 17. Notifications, Emails, SMS, Push
+
+| Trigger event | In-app | Email | SMS | Push |
+|---|---|---|---|---|
+| `capital_call.initiated` | ✔ (to LP) | ✔ (call notice) | — | — |
+| `capital_call.overdue` | ✔ (to GP/IR) | ✔ (to LP, reminder) | — | — |
+| `distribution.disbursed` | ✔ | ✔ (disbursement notice) | — | — |
+| `accreditation.expiring` | ✔ | ✔ | — | — |
+| `subscription_document.signed` | ✔ | ✔ (confirmation) | — | — |
+| `quarterly_package.published` | ✔ (to LP) | ✔ | — | — |
+
+All channels follow
+[email-sms-standards.md](../../standards/email-sms-standards.md) and
+[notification-standards.md](../../standards/notification-standards.md).
+
+## 18. Permissions & Roles
+
+Extends [ZodiCore's default roles](../../security/rbac-permissions.md#default-system-roles)
+with fund-specific roles: `Fund Controller/CFO`, `Investor Relations`,
+`General Partner`, `Compliance Officer`, `Limited Partner` (portal-scoped
+external role). Key permissions: `funds.manage`, `capital_calls.initiate`,
+`capital_calls.approve`, `distributions.initiate`, `distributions.approve`,
+`nav.record`, `accreditation.verify`, `portal.view_own_account` (LP role
+default, cannot be escalated to view other LPs' data). Full model per
+[rbac-permissions.md](../../security/rbac-permissions.md).
+
+## 19. Workflows & Approval Chains
+
+- **Capital call approval**: a capital call calculated by Fund Controller
+  requires General Partner approval before notices send to LPs; the
+  approver must be distinct from the initiator for funds above a
+  tenant-configured size threshold.
+- **Distribution approval**: a modeled distribution waterfall requires
+  General Partner approval before disbursement, with the full waterfall
+  calculation shown for review, matching
+  [modal-standards.md](../../standards/modal-standards.md#confirmation-dialogs).
+- **NAV valuation approval**: a recorded NAV valuation requires Fund
+  Controller sign-off before it becomes the fund's official NAV for
+  performance-reporting purposes; prior valuations are retained, never
+  overwritten.
+- **Accreditation re-verification escalation**: an LP who does not
+  re-verify within the grace period is flagged for GP review, which may
+  result in a hold on future capital calls to that LP pending resolution.
+
+## 20. Audit Logs
+
+Every capital call, distribution, NAV valuation, accreditation decision,
+and subscription document signature writes an immutable audit entry via
+ZodiCore's audit log ([audit-logging.md](../../security/audit-logging.md)),
+capturing actor, timestamp, and before/after state. Capital account
+balances are computed from the append-only call/distribution/valuation
+ledger rather than stored as a mutable running total, so the full history
+is always reconstructible and auditable.
+
+## 21. Reports & Analytics & Dashboards
+
+- Operational dashboard: fund AUM, capital called-to-date vs. committed,
+  distribution-to-date, open capital calls, accreditation status summary —
+  per [dashboard-standards.md](../../standards/dashboard-standards.md).
+- Performance: fund and per-LP IRR/MOIC/DPI/TVPI, benchmark comparison
+  against vintage-year peer data where available.
+- Investor relations: quarterly report package, capital call funding-rate
+  report, LP communication history.
+- Report builder and scheduled report delivery per the second-layer
+  baseline in [product-philosophy.md](../../development/product-philosophy.md#second-layer-feature-catalog).
+
+## 22. Integrations
+
+- **E-signature providers**: subscription document signature workflow
+  integration (e.g. DocuSign/Adobe Sign-class vendors) behind an
+  `ESignatureProviderContract`.
+- **Accredited-investor verification**: third-party verification services
+  (income/net-worth/professional-certification verification vendors)
+  behind an `AccreditationVerificationContract`.
+- **Fund administration/accounting export**: optional export connectors for
+  funds that retain a third-party fund administrator alongside ZodiCapital
+  during a transition period.
+- **Portfolio valuation data**: integration category for pulling comparable
+  valuation data (e.g. PitchBook/Preqin-class data vendors) to support NAV
+  and benchmark reporting.
+- **Banking/payment rails**: wire transfer initiation for capital call
+  funding and distribution disbursement, sharing the payment-rail
+  integration category described in
+  [ZodiBank §22](../ZodiBank/SPEC.md#22-integrations).
+
+## 23. AI Features
+
+- Waterfall scenario modeling assistant: given a hypothetical exit value,
+  generates a plain-language summary of how the distribution waterfall
+  would allocate proceeds across return-of-capital, preferred return, and
+  carry, before the GP commits to an actual distribution.
+- Quarterly report drafting assistant: generates a first-draft narrative
+  summary of fund performance and portfolio company highlights for Fund
+  Controller/IR review and edit, never auto-published without human
+  approval.
+- Anomaly detection on capital account activity, layered on top of
+  ZodiCore's audit-log anomaly detection ([ZodiCore §23](../ZodiCore/SPEC.md#23-ai-features)),
+  tuned for unusual call/distribution timing patterns.
+
+## 24. Automation, Scheduled Jobs, CLI Commands
+
+- Scheduled jobs: capital call overdue-status checks, accreditation
+  expiry reminders, quarterly report package generation trigger,
+  performance-snapshot recalculation on new NAV valuation.
+- CLI commands (Artisan): `capital:calculate-call`,
+  `capital:calculate-distribution`, `capital:recalculate-performance`,
+  `capital:check-accreditation-expiry` — each requires the same
+  authorization context as its API equivalent, per
+  [ZodiCore §24](../ZodiCore/SPEC.md#24-automation-scheduled-jobs-cron-jobs-cli-commands).
+
+## 25. Seed/Demo Data
+
+`CapitalDemoSeeder` provisions a demo tenant with two or three demo funds
+across different vintage years, 30+ synthetic LPs with varied commitment
+sizes and accreditation states, a full capital call and distribution
+history spanning several years, quarterly NAV valuation history, and
+signed subscription documents — per
+[migration-seeder-standards.md](../../development/migration-seeder-standards.md#seeders)
+and the Demo Standard in [README.md](../../../README.md).
+
+## 26. Performance Requirements
+
+See §10; additionally: IRR/MOIC recalculation across a fund's full
+cash-flow history completes in under 5 seconds p95 even for funds with 10+
+years of call/distribution history.
+
+## 27. Security Requirements
+
+Financial products carry Zodize's highest security/compliance bar. Full
+baseline from [security-standards.md](../../security/security-standards.md)
+applies, plus:
+
+- **PCI-DSS-equivalent handling** for any stored payment/wire instruction
+  data used in capital call funding, tokenized/masked and never logged in
+  plaintext.
+- **SOC2-equivalent controls**: change management and access review apply
+  to fund accounting and investor portal modules with the same rigor as
+  the ZodiCore platform baseline.
+- **KYC/AML and accredited-investor verification** required before a
+  commitment can be recorded as active, with periodic re-verification
+  enforced by scheduled job per §24, not manual process.
+- **Immutable audit trails**: capital call, distribution, and NAV audit
+  entries are append-only, matching §20.
+- **MFA is mandatory, not optional**, for every internal user role
+  (Fund Controller, Investor Relations, General Partner, Compliance) and
+  strongly enforced for LP portal access given the sensitivity of capital
+  account data, per
+  [authentication-authorization.md](../../security/authentication-authorization.md).
+- LP data isolation: an LP's portal session can never query another LP's
+  capital account, enforced at the RBAC policy layer per §11, with a
+  dedicated cross-LP isolation test per §28.
+
+## 28. Testing Requirements
+
+Full baseline from
+[testing-standards.md](../../development/testing-standards.md); additionally
+a dedicated waterfall-calculation regression suite validated against known
+reference distribution scenarios, and a cross-LP data isolation test suite
+asserting no LP portal session can read another LP's capital account or
+documents.
+
+## 29. Deployment Requirements
+
+Per [deployment-template.md](../../templates/deployment-template.md).
+Capital call and distribution calculation changes require a documented
+finance-logic review in addition to the standard PR review per
+[pr-standards.md](../../development/pr-standards.md), given the direct
+financial impact of a calculation error.
+
+## 30. Acceptance Criteria
+
+- A fund can be created, an LP onboarded through subscription and
+  accreditation verification, and a capital commitment recorded end-to-end
+  with no manual data entry outside the platform.
+- A capital call correctly calculates each LP's pro-rata share, requires
+  GP approval, and tracks funding status to completion.
+- A distribution correctly allocates proceeds through the fund's
+  configured waterfall and updates each LP's capital account and
+  cumulative distribution history.
+- IRR and MOIC calculations match reference values for a defined regression
+  fixture set at both fund and per-LP level.
+- An LP portal user can view only their own capital account, documents,
+  and performance data, verified by an automated isolation test.
+
+## 31. Production Checklist
+
+See [production-readiness-checklist.md](../../checklists/production-readiness-checklist.md)
+and [security-checklist.md](../../checklists/security-checklist.md).
+ZodiCapital additionally requires sign-off from a compliance stakeholder
+that accredited-investor verification and subscription document workflows
+have been validated against the fund's actual regulatory jurisdiction
+before go-live.
+
+## 32. Future Roadmap
+
+- Secondary market/LP transfer support (recording and processing an LP
+  interest transfer mid-fund).
+- Multi-currency fund support for global LP bases.
+- Co-investment vehicle and SPV-specific waterfall templates.
+
+## 33. Known Risks
+
+- Waterfall calculation complexity: fund waterfalls vary significantly by
+  fund and can include multiple tiers, catch-up provisions, and clawback
+  mechanics — mitigated by the configurable `waterfall_config_json` model
+  and regression test suite, but remains the module's highest-complexity
+  surface.
+- Valuation subjectivity: NAV for illiquid private-fund assets depends on
+  GP-provided valuations rather than a market price feed; ZodiCapital
+  records and audits the valuation but does not independently verify its
+  accuracy.
+
+## 34. Future Improvements
+
+- Configurable clawback provision modeling in the distribution waterfall.
+- Automated benchmark comparison against third-party vintage-year
+  performance data feeds.
+
+## Roadmap (spec depth)
+
+This spec is Foundation-depth. Queued for Deep-depth expansion: a full ER
+diagram and migration set for the fund/capital-account/waterfall schema
+(companion `DATA_MODEL.md`), a complete endpoint catalog including the full
+investor portal surface (companion `API_REFERENCE.md`) matching
+[ZodiCore's structure](../ZodiCore/SPEC.md), and a full report catalog
+covering additional fund-type-specific reporting (real assets, fund-of-
+funds). Changes follow [CONTRIBUTING.md](../../../CONTRIBUTING.md).
