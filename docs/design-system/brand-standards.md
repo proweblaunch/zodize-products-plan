@@ -44,13 +44,16 @@ principles:
 Zodize's brand color is an indigo-violet, chosen for its association with
 trust and technical precision without the coldness of pure blue or the
 volatility connotations of pure violet. This is the **one color every
-Zodize product shares**, used as the platform-level brand mark (ZodiCore,
-the handbook, internal tooling, auth screens) and as the default accent for
-any product that has not yet declared its own in `docs/products/<product>/SPEC.md`.
+Zodize product shares**, used as the handbook/internal-tooling brand mark
+(the handbook itself, internal tooling, auth screens) and as the default
+accent for any product that has not yet declared its own in
+`docs/products/<product>/SPEC.md` — including `ZodiCore`, the general-purpose
+back-office/ERP starter product, which uses the master brand color directly
+as its own accent rather than a rotated hue.
 
 | Token | Hex | HSL | Usage |
 |---|---|---|---|
-| `--zdz-brand-primary` | `#6366F1` | `hsl(239, 84%, 67%)` | Platform brand mark, default accent, primary buttons on unbranded surfaces |
+| `--zdz-brand-primary` | `#6366F1` | `hsl(239, 84%, 67%)` | Handbook/internal-tooling brand mark, default accent, primary buttons on unbranded surfaces |
 | `--zdz-brand-primary-hover` | `#818CF8` | `hsl(234, 89%, 74%)` | Hover state of the above |
 | `--zdz-brand-primary-active` | `#4F46E5` | `hsl(243, 75%, 59%)` | Pressed/active state |
 | `--zdz-brand-ink` | `#0B0D12` | `hsl(226, 20%, 6%)` | Master near-black background |
@@ -96,8 +99,8 @@ notifications, onboarding — follows one voice across all 20 products:
 - **Respectful of expertise.** Zodize users are professionals — bank
   operators, clinicians, brokers, property managers. Copy does not
   over-explain domain concepts they already know, but MUST explain Zodize-
-  specific concepts (permissions, plugin marketplace, tenancy) clearly on
-  first encounter.
+  specific concepts (permissions, plugin marketplace, multi-company/branch
+  scoping) clearly on first encounter.
 
 ### Do
 
@@ -159,7 +162,7 @@ changes).
 
 | Product | Accent Hue | Rationale |
 |---|---|---|
-| ZodiCore | Brand Indigo (`#6366F1`) | Platform-level product; uses the master brand color directly |
+| ZodiCore | Brand Indigo (`#6366F1`) | General-purpose back-office/ERP starter product; uses the master brand color directly |
 | ZodiBank | Deep Blue | Trust, stability, traditional banking association |
 | ZodiTrade | Cyan | Speed, live markets, clarity of data |
 | ZodiXchange | Electric Blue | Adjacent to ZodiTrade but higher saturation for market infrastructure |

@@ -34,10 +34,14 @@ outside of a small, explicit allowlist such as debug-toolbar registration).
 
 Every product's `.env.example` includes, at minimum: `APP_ENV`, `APP_URL`,
 `APP_KEY`, `DB_*`, `REDIS_*`, `QUEUE_CONNECTION`, `MAIL_*`,
-`BROADCAST_CONNECTION`, `SENTRY_DSN`-equivalent for error tracking
-([monitoring-observability.md](../quality/monitoring-observability.md)), and
-the tenant/multi-tenancy configuration keys defined in
-[multi-tenancy.md](../architecture/multi-tenancy.md).
+`BROADCAST_CONNECTION`, and `SENTRY_DSN`-equivalent for error tracking
+([monitoring-observability.md](../quality/monitoring-observability.md)).
+`DB_*` is the only configuration a buyer sets at the file level — everything
+else (branding, gateways, wallet, KYC, referrals, plans, i18n, CMS) is
+configured after install from the admin panel, per
+[admin-configuration-baseline.md](../standards/admin-configuration-baseline.md)
+and
+[overview.md](../architecture/overview.md#the-business-model-this-architecture-serves).
 
 ## Feature-tier configuration
 
@@ -46,7 +50,7 @@ Plan/tier-gated features (see
 are controlled through the feature flag system
 ([feature-flags.md](./feature-flags.md)), never through environment
 variables — environment variables configure the deployment, feature flags
-configure product behavior per tenant.
+configure product behavior within that one deployment.
 
 ## Validation on boot
 

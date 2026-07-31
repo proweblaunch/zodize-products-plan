@@ -75,7 +75,7 @@ model based on blast radius:
   invoice", never a bare "Confirm" or "OK"). Example: deleting one contact,
   deactivating one user.
 - **Tier 3 — High risk: bulk operations, financial transfers, permission
-  or tenant-wide changes, or permanent data loss at scale**: a `sm`
+  or company/branch-wide changes, or permanent data loss at scale**: a `sm`
   confirmation modal that additionally REQUIRES the user to type a specific
   confirmation phrase into a text input before the primary action button
   becomes enabled. The phrase is either the exact record identifier/name

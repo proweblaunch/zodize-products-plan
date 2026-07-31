@@ -181,9 +181,12 @@ in code:
    never by duplicating component logic — see [Dark Theme](./dark-theme.md)
    for the full switching mechanism.
 5. **Product theming** is handled by the `data-product` attribute shown
-   above, set once at the application shell root from the authenticated
-   tenant's product identity, overriding only the `accent` token group.
-   No other token group is ever overridden per product.
+   above, set once at the application shell root from the deployment's own
+   product identity (fixed per deployment, since each deployment is one
+   product for one buyer — see
+   [`../architecture/single-tenant-deployment-model.md`](../architecture/single-tenant-deployment-model.md)),
+   overriding only the `accent` token group. No other token group is ever
+   overridden per product.
 
 ## Open Questions
 

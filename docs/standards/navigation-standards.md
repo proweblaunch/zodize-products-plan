@@ -58,14 +58,22 @@ full-width above it in collapsed/mobile layouts), and is always visible
 - **Center or left-of-actions**: global search input. Clicking or focusing it
   opens the command palette (see below) rather than a separate search UI —
   Zodize does not maintain two competing search entry points.
-- **Right, in fixed order**: organization/tenant switcher (if the user
-  belongs to more than one tenant) → notification bell → user menu.
-  - **Org/tenant switcher**: renders the current tenant's name and logo/
-    initials. Clicking opens a dropdown listing all tenants the user belongs
-    to, each with logo, name, and role, plus a "Manage organizations" link
-    at the bottom. Switching tenants triggers a full context reload (not a
-    partial SPA swap) to guarantee no cross-tenant data leakage in client
-    state.
+- **Right, in fixed order**: company/branch switcher (if the product
+  supports multi-company/multi-branch scoping per
+  [`localization-i18n.md`](./localization-i18n.md#multi-company--multi-branch-data-scoping)
+  and the user has access to more than one company or branch) → notification
+  bell → user menu.
+  - **Company/branch switcher**: renders the current company/branch's name
+    and logo/initials. Clicking opens a dropdown listing every company/
+    branch the user has access to, each with logo, name, and the user's role
+    at that branch, plus an "All branches" option (for users with
+    cross-branch permission) and a "Manage branches" link at the bottom.
+    Switching triggers a full context reload (not a partial SPA swap) to
+    guarantee no cross-branch data leakage in client state. There is no
+    organization/tenant switcher — every deployment belongs to exactly one
+    buyer's business (see
+    [`../architecture/single-tenant-deployment-model.md`](../architecture/single-tenant-deployment-model.md)),
+    and a product with no multi-branch concept omits this switcher entirely.
   - **Notification bell**: shows an unread-count badge and opens the
     notification center panel on click, per
     [`notification-standards.md`](./notification-standards.md#notification-center).
@@ -114,7 +122,7 @@ record, and is the primary interface for Principle 4 (keyboard-first) in
   "View all N results" row if truncated.
 - **Search behavior**: debounced at 200ms, queries the product's global
   search endpoint, and MUST return results within 300ms at the p95 for a
-  tenant with up to 100k records (see
+  deployment with up to 100k records (see
   [`../development/`](../development) API performance standards). A loading
   spinner replaces the category headers while a query is in flight; results
   from the previous query are not shown stale.
@@ -137,9 +145,9 @@ Below the tablet breakpoint defined in
   [`modal-standards.md`](./modal-standards.md#drawers)) with a scrim behind
   it; tapping the scrim or a nav item closes it.
 - The top bar collapses to: hamburger, page title (centered or left-aligned
-  per product), notification bell, user avatar. The org switcher and search
-  input move inside the sidebar drawer's header on mobile rather than
-  competing for top bar space.
+  per product), notification bell, user avatar. The company/branch switcher
+  and search input move inside the sidebar drawer's header on mobile rather
+  than competing for top bar space.
 - The command palette remains available via the search entry in the sidebar
   drawer; a dedicated on-screen keyboard shortcut is not applicable on
   touch, so a visible "Search" row with a magnifying-glass icon MUST be the

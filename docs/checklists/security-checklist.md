@@ -31,8 +31,12 @@ mandatory sub-gate of
 - [ ] Every API endpoint has an automated test asserting a `403` for a
       request lacking the required permission, per
       [`../templates/testing-template.md`](../templates/testing-template.md).
-- [ ] Cross-tenant access is impossible and covered by an automated test
-      per [`../architecture/multi-tenancy.md`](../architecture/multi-tenancy.md).
+- [ ] If the product supports multi-company/multi-branch scoping per
+      [`../standards/localization-i18n.md`](../standards/localization-i18n.md#multi-company--multi-branch-data-scoping),
+      cross-branch access without the requisite permission is impossible and
+      covered by an automated test. There is no cross-tenant isolation test
+      category — see
+      [`../architecture/single-tenant-deployment-model.md`](../architecture/single-tenant-deployment-model.md#what-single-tenant-changes-in-the-data-model).
 - [ ] User impersonation, if used, writes a mandatory audit log entry on
       start and end per [`../templates/admin-template.md`](../templates/admin-template.md).
 

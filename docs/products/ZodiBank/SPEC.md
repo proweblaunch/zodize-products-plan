@@ -8,9 +8,19 @@
 > this document. See [PRODUCT_CATALOG.md](../../../PRODUCT_CATALOG.md) for
 > spec status definitions.
 
-Built on [ZodiCore](../ZodiCore/SPEC.md) — ZodiBank does not reimplement
-identity, tenancy, billing, notifications, RBAC, plugins, or audit logging;
-it consumes those services and adds banking-domain modules on top.
+ZodiBank is a standalone, self-hosted Laravel application built by cloning
+the sanitized [base codebase](../../architecture/base-codebase-strategy.md)
+and layering banking-domain modules on top. Unlike every other product in
+the catalog, ZodiBank does **not** run the
+[genericization checklist's](../../architecture/product-genericization-checklist.md)
+loan/DPS/FDR removal step — it keeps and extends the base engine's inherited
+loan, DPS, and FDR tables as its own core banking modules, rather than
+stripping them. It does not depend on any other Zodize product or on a
+central "ZodiCore" platform for identity, billing, notifications, or
+tenancy — see
+[single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md).
+`ZodiCore` is itself just another standalone product in the catalog (a
+general-purpose back-office/ERP starter), not a platform ZodiBank runs on.
 
 ## 1. Vision
 
@@ -28,9 +38,10 @@ Standing up core banking today means choosing between decades-old cores
 (Fiserv, FIS, Jack Henry) that are slow to integrate, or piecing together a
 ledger vendor, a card issuer processor, a KYC vendor, and a payments rail
 integration by hand. ZodiBank exists to give a digital bank or credit union
-one coherent system — general ledger, deposit accounts, card issuing, ACH/
-wire movement, and regulatory reporting — that inherits ZodiCore's identity
-and audit backbone instead of building its own.
+one coherent, self-hosted system — general ledger, deposit accounts, card
+issuing, ACH/wire movement, and regulatory reporting — built on a base
+codebase whose wallet/ledger, RBAC, KYC, and audit engine already work,
+instead of building its own from scratch.
 
 ## 3. Target Market
 
@@ -50,10 +61,10 @@ programs.
 
 | Capability | Comparable to | Zodize differentiation |
 |---|---|---|
-| Core banking ledger | Mambu, Thought Machine (Vault), Temenos | Ships with tenant/RBAC/audit already built via ZodiCore, no separate identity integration project |
-| Digital account origination | nCino, Narmi, Alkami | Deposit onboarding and KYC/AML wired directly into ZodiCore's tenancy and audit model from day one |
+| Core banking ledger | Mambu, Thought Machine (Vault), Temenos | Ships with RBAC/audit/wallet-ledger already built into the inherited base codebase, no separate identity integration project |
+| Digital account origination | nCino, Narmi, Alkami | Deposit onboarding and KYC/AML wired directly into the base engine's KYC and audit model from day one |
 | Card issuing/processing | Marqeta, Galileo, i2c | Card issuing module shares one permission and audit model with the rest of the bank's operations, not a bolted-on processor console |
-| BaaS/sponsor-bank platforms | Unit, Treasury Prime, Synctera | Zodize's plugin runtime lets a program layer custom compliance rules without forking core ledger code |
+| BaaS/sponsor-bank platforms | Unit, Treasury Prime, Synctera | Each buyer runs their own fully independent, self-hosted deployment, so a program layers custom compliance rules on its own codebase without forking anyone else's ledger code |
 | Regulatory/call reporting | Ncontracts, Abrigo | Call-report-style extracts generated directly from the same ledger of record, not a reconciled shadow system |
 
 ## 6. Personas
@@ -65,11 +76,14 @@ programs.
 - **Card Program Manager** — configures card products, controls, and
   dispute/chargeback handling.
 - **Accountholder (retail/business)** — opens and uses a checking/savings
-  account and cards via the tenant's branded digital banking experience.
+  account and cards via the bank's own branded digital banking experience.
 - **Treasury/Finance Analyst** — reconciles the general ledger, reviews
   interest accrual, and produces financial statements.
 - **Fraud Analyst** — reviews fraud rule alerts and disposes of cases.
-- **Zodize Support/Ops** — as defined in [ZodiCore §6](../ZodiCore/SPEC.md#6-personas).
+- **Buyer's own IT/support staff** — the only support layer this deployment
+  has; there is no Zodize-operated support console, since each deployment is
+  the buyer's own standalone codebase (see
+  [admin-template.md](../../templates/admin-template.md)).
 
 ## 7. User Journeys
 
@@ -78,7 +92,7 @@ programs.
    scoring determines auto-approve, manual review, or decline → on
    approval, a checking account and general-ledger sub-account are created
    atomically → welcome package (account number, routing number, first
-   card offer) sent via [ZodiCore notifications](../ZodiCore/SPEC.md#17-notifications-emails-sms-push).
+   card offer) sent via the inherited notification dispatcher (§17).
 2. **Card issuance and activation**: accountholder requests a debit card →
    card issuing module provisions a card record (PAN handling per §27) →
    physical card ships or virtual card is available instantly → accountholder
@@ -115,7 +129,9 @@ programs.
 ## 9. Functional Requirements
 
 - Deposit account products: checking, savings, and configurable sub-account
-  types (e.g. goal-based savings buckets) per tenant.
+  types (e.g. goal-based savings buckets), admin-configurable per the
+  genericized `Plan` pattern (see
+  [base-codebase-strategy.md](../../architecture/base-codebase-strategy.md#genericizing-the-plan-pattern)).
 - Double-entry general ledger: every account movement posts as a balanced
   debit/credit pair to an append-only ledger; no update-in-place on posted
   entries, only reversing entries.
@@ -163,18 +179,38 @@ inherited baseline. ZodiBank-specific additions:
 
 ## 11. Architecture
 
-ZodiBank is a Laravel application consuming ZodiCore's identity, tenancy,
-billing, notification, RBAC, plugin, and audit packages exactly as described
-in [ZodiCore §11](../ZodiCore/SPEC.md#11-architecture). It adds a
-`zodize/banking-ledger` domain package providing the append-only
-double-entry ledger, plus dedicated banking modules (accounts, cards,
-payments, compliance, fraud) that register their entities into ZodiCore's
-audit log, RBAC policy registry, and global search index rather than
-maintaining parallel systems. Card authorization and ACH/wire processing
-run as dedicated queued workers (per
+ZodiBank is built by cloning the sanitized
+[base codebase](../../architecture/base-codebase-strategy.md) — a single,
+independent Laravel application the buyer deploys entirely on their own
+shared/VPS hosting, per
+[single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md).
+It inherits the base engine's wallet/ledger, payment gateways, RBAC/auth
+(`Role`/`Permission` models), KYC, i18n, admin configuration surface, and
+audit logging as-is (see
+[base-codebase-strategy.md](../../architecture/base-codebase-strategy.md#inherited-as-is-the-admin-engine-every-product-keeps)).
+
+ZodiBank is the one product in the catalog that does **not** run
+[Step 2 of the genericization checklist](../../architecture/product-genericization-checklist.md#step-2--strip-banking-domain-specific-tables-models-and-controllers):
+it keeps the base engine's `loans`/`loan_plans`, `dps`/`dps_plans`, and
+`fdr`/`fdr_plans` tables and controllers, and re-adds them as its own
+first-class domain modules — Deposit Accounts, General Ledger, Card
+Issuing, Payments, Onboarding & Compliance, Fraud, Regulatory Reporting, and
+Overdraft/NSF — built on top of the genericized `Plan` model per
+[base-codebase-strategy.md](../../architecture/base-codebase-strategy.md#genericizing-the-plan-pattern),
+rather than being stripped and rebuilt from zero. These domain modules
+consume the inherited wallet/ledger engine (extended per §14's
+multi-currency note), RBAC, KYC, and audit log the same way any other
+application code does — they never fork or duplicate an inherited
+controller/model to add banking behavior. Card authorization and ACH/wire
+processing run as dedicated queued workers (per
 [caching-queues-events.md](../../architecture/caching-queues-events.md))
-isolated from the request path so a processor outage degrades gracefully
-instead of blocking the core app.
+isolated from the request path, with a synchronous fallback for buyers on
+hosting without persistent worker support, so a processor outage degrades
+gracefully instead of blocking the core app. ZodiBank has no runtime
+dependency on any other Zodize product or on a Zodize-operated central
+service; the only external dependencies are the third-party KYC, card
+processor, and payment-rail integrations the buyer's own institution
+configures (§22).
 
 ## 12. Technology
 

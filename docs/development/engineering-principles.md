@@ -4,14 +4,23 @@ These principles govern every technical decision made across every Zodize
 product. When a standard elsewhere in this handbook seems to conflict with
 another, resolve the conflict by returning to these principles.
 
-## 1. One platform, many products
+## 1. One base codebase, twenty independent products
 
-Every Zodize product is a tenant application on top of [ZodiCore](../products/ZodiCore/SPEC.md).
-Identity, billing, tenancy, notifications, permissions, and the plugin runtime
-are built once, correctly, and consumed everywhere. A product team does not
-get to reimplement authentication because "this product is different." If a
-product's requirements genuinely cannot be met by the platform, that is a
-platform gap to fix, not a license to fork.
+Every Zodize product is a fully independent, self-hosted, single-tenant
+Laravel application — there is no shared "ZodiCore platform" any product
+depends on at runtime; `ZodiCore` is itself just one of the twenty sellable
+products (a general-purpose back-office/ERP starter). What every product
+shares instead is a common starting point: one audited base codebase,
+cloned per product, that already provides a working identity/RBAC engine,
+wallet/ledger, payment gateway integrations, notifications, and admin
+configuration surface. This is built once, correctly, in the base, and
+inherited — never reimplemented — by every product that clones it. See
+[base-codebase-strategy.md](../architecture/base-codebase-strategy.md) and
+[single-tenant-deployment-model.md](../architecture/single-tenant-deployment-model.md).
+A product team does not get to reimplement authentication because "this
+product is different." If a product's requirements genuinely cannot be met
+by the inherited base engine, that is a base-codebase gap to fix once
+(before the next clone), not a license to fork per product.
 
 ## 2. Boring technology, exceptional execution
 
@@ -28,10 +37,13 @@ boring option was insufficient.
 
 Each product is built as a modular monolith: strong internal module
 boundaries (see [module-template.md](../templates/module-template.md)),
-single deployable unit, single database with tenant scoping. Services are
-only extracted when a concrete scaling or isolation requirement demands it,
-documented via ADR. This keeps operational complexity proportional to actual
-need. See [architecture/overview.md](../architecture/overview.md).
+single deployable unit, single database belonging to exactly one buyer's
+business — see
+[single-tenant-deployment-model.md](../architecture/single-tenant-deployment-model.md).
+Services are only extracted when a concrete scaling or isolation requirement
+demands it, documented via ADR. This keeps operational complexity
+proportional to actual need. See
+[architecture/overview.md](../architecture/overview.md).
 
 ## 4. Every standard is testable and enforced in CI
 
@@ -42,8 +54,8 @@ automated test, it must be. See [ci-cd-standards.md](../quality/ci-cd-standards.
 ## 5. Security and audit are not features, they are properties
 
 Authentication, authorization, and audit logging are not modules a product
-can opt out of — they are properties of the platform every product inherits.
-See [docs/security/](../security/security-standards.md).
+can opt out of — they are properties of the base codebase's inherited engine
+every product builds on. See [docs/security/](../security/security-standards.md).
 
 ## 6. Design once, theme many
 

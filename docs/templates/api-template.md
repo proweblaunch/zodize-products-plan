@@ -127,11 +127,16 @@ Every new endpoint MUST satisfy this checklist before merge:
 - [ ] Covered by feature tests per [testing-template.md](./testing-template.md),
       including an authorization-denial case.
 
-## What ZodiCore provides vs. what a product customizes
+## What the inherited base codebase provides vs. what a product customizes
 
-ZodiCore provides: the base API middleware stack (auth, rate limiting,
-tenant resolution), the standard envelope/error response formatters, the
-pagination trait, and the filter/sort query parser.
+The base codebase (see
+[`../architecture/base-codebase-strategy.md`](../architecture/base-codebase-strategy.md))
+provides: the base API middleware stack (auth via the `api_tokens`/Sanctum-
+style guard, rate limiting), the standard envelope/error response
+formatters, the pagination trait, and the filter/sort query parser. There is
+no tenant-resolution middleware — every request is already scoped to the
+one business that owns the deployment, per
+[`../architecture/single-tenant-deployment-model.md`](../architecture/single-tenant-deployment-model.md).
 
 A product customizes: its own resource endpoints, filterable/sortable field
 allow-lists per resource, and resource-specific response shapes within the

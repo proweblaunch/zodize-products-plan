@@ -24,15 +24,12 @@ opt-out:
 - **Destructive actions**: delete, bulk delete, restore-from-trash, and any
   action that voids/reverses a previously committed record (e.g.
   `invoices.void`, `trades.cancel`).
-- **Impersonation**: every impersonation session start and end, performed by
-  the Support/Impersonator role defined in
-  [`rbac-permissions.md`](./rbac-permissions.md#default-system-roles).
 - **Financial transactions**: every state-changing action on a monetary
   record — payment captured, refund issued, transfer executed, trade filled,
   ledger entry posted — regardless of amount.
-- **Tenant and settings changes**: tenant provisioning/deprovisioning,
-  billing plan changes, SSO configuration changes, API token issuance and
-  revocation.
+- **Settings changes**: general settings/branding changes, payment gateway
+  configuration changes, license/plan changes, SSO configuration changes,
+  API token issuance and revocation.
 
 Read-only access to non-sensitive resources is not audited by default (it
 would drown the log); read access to `restricted`-classified resources
@@ -47,15 +44,14 @@ append-only `audit_logs` table (or equivalent event store):
 | Field | Description |
 |---|---|
 | `id` | Unique identifier (UUID, not sequential, to avoid leaking volume). |
-| `tenant_id` | The tenant the event occurred in. Nullable only for platform-level (ZodiCore admin) events. |
 | `actor_id` / `actor_type` | The user (or system process, e.g. `system:scheduler`) that performed the action. |
 | `actor_display_name` | Denormalized snapshot of the actor's name at the time of the event, so the entry remains legible after the user record changes or is deleted. |
-| `action` | The permission-style identifier of what happened, e.g. `invoices.delete`, `auth.login_failed`, `users.impersonate.start`. |
+| `action` | The permission-style identifier of what happened, e.g. `invoices.delete`, `auth.login_failed`, `roles.permission_granted`. |
 | `subject_type` / `subject_id` | The model class and ID the action was performed on. |
 | `before` / `after` | JSON snapshots of the changed attributes only (not the full record) — a diff, not a duplicate of the row. Null `before` for creates, null `after` for deletes. |
 | `ip_address` | The originating IP, captured from the request, not from a client-supplied header. |
 | `user_agent` | Raw user agent string of the originating request. |
-| `metadata` | Free-form JSON for action-specific context (e.g. impersonation reason, export format and row count). |
+| `metadata` | Free-form JSON for action-specific context (e.g. export format and row count, reason entered for a manual balance adjustment). |
 | `occurred_at` | UTC timestamp with millisecond precision, set server-side, never client-supplied. |
 
 ## Immutability requirement
@@ -79,7 +75,7 @@ append-only `audit_logs` table (or equivalent event store):
 |---|---|
 | Standard products | 1 year, minimum, from `occurred_at`. |
 | Financial-grade products | 7 years, minimum, from `occurred_at`, matching typical financial recordkeeping requirements. |
-| Healthcare-grade products (ZodiMed) | 6 years, minimum, from `occurred_at`, or longer where the tenant's jurisdiction requires it — the product SPEC MUST document the applicable jurisdictional minimum and use the longer of the two. |
+| Healthcare-grade products (ZodiMed) | 6 years, minimum, from `occurred_at`, or longer where the buyer's operating jurisdiction requires it — the product SPEC MUST document the applicable jurisdictional minimum and use the longer of the two. |
 
 Audit logs MUST NOT be deleted by the standard data-retention/deletion
 tooling described in

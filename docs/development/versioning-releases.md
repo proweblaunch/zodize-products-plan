@@ -41,11 +41,12 @@ partially paid," not "refactored InvoiceService::pay()."
 
 Any deprecation (an API version, an SDK major version, a feature being
 sunset) is announced a minimum of 90 days ahead via the changelog, an
-in-product banner for affected tenants, and (for API/SDK deprecation) the
-`Sunset` HTTP header per [api-standards.md](./api-standards.md#versioning).
+in-product banner shown within the running application, and (for API/SDK
+deprecation) the `Sunset` HTTP header per
+[api-standards.md](./api-standards.md#versioning).
 
 ## Release notes template
 
 See [release-template.md](../templates/release-template.md) for the
 customer-facing release notes structure and the internal rollout-stage
-checklist (internal → beta tenants → GA).
+checklist (internal → beta buyers → GA).

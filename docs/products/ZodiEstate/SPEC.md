@@ -46,7 +46,7 @@ use), and student/off-campus housing operators.
 
 | Capability | Comparable to | Zodize differentiation |
 |---|---|---|
-| Property/lease management + tenant portal | AppFolio, Buildium | Built on ZodiCore's RBAC/audit/plugin runtime instead of a siloed vertical stack |
+| Property/lease management + tenant portal | AppFolio, Buildium | Built on the same audited, single-tenant base engine (RBAC, audit logging, wallet/ledger) as every other Zodize product, sold as source code the property manager owns and hosts, instead of a siloed hosted vertical stack |
 | Trust accounting for deposits/owner funds | Buildium Trust Accounting, RealPage | Double-entry trust ledger enforced at the data-model level, not a bolt-on report |
 | Maintenance/work order management | Property Meld, Rentvine | Unified with leasing and accounting rather than a separate integrated tool |
 | Owner/investor reporting | RealPage, Yardi Voyager (enterprise tier) | Yardi-grade owner statements available to mid-market operators, not just enterprise accounts |
@@ -161,20 +161,58 @@ inherited baseline. ZodiEstate-specific additions:
 
 ## 11. Architecture
 
-ZodiEstate is a tenant application on [ZodiCore](../ZodiCore/SPEC.md),
-consuming `zodize/core-identity`, `zodize/core-billing`,
-`zodize/core-notifications`, `zodize/core-permissions`, and
-`zodize/core-plugins` as described in ZodiCore's
-[Architecture](../ZodiCore/SPEC.md#11-architecture) section. ZodiEstate adds
-its own modules (Properties, Leasing, Trust Accounting, Maintenance, Owner
-Portal) as Laravel domains within the tenant application, each registering
-its permissions with ZodiCore's RBAC engine, its searchable entities with
-global search, and its ledger writes through a dedicated
-`TrustLedgerContract` that enforces double-entry, append-only posting
-independent of ZodiCore's platform billing ledger (ZodiEstate's trust ledger
-represents client/tenant funds, not Zodize's own revenue). Multi-property,
-multi-company portfolio structure maps onto ZodiCore's tenant/company/branch
-hierarchy per [multi-tenancy.md](../../architecture/multi-tenancy.md).
+ZodiEstate is a standalone, self-hosted Laravel application, built by
+cloning the sanitized base codebase and running the
+[genericization checklist](../../architecture/product-genericization-checklist.md)
+per
+[base-codebase-strategy.md](../../architecture/base-codebase-strategy.md).
+The clone strips the banking-specific tables that don't apply to property
+management — `loans`/`loan_plans`, `dps`/`dps_plans`, `fdr`/`fdr_plans`,
+`other_banks`, `beneficiaries`, `airtime_operators`/`airtime_configs` — and
+keeps the `branches`/`branch_staff` guard, re-purposed rather than dropped:
+a property management firm's field staff (leasing agents, maintenance
+technicians assigned to specific properties) are modeled as
+branch-scoped staff per
+[product-genericization-checklist.md § Step 4](../../architecture/product-genericization-checklist.md#step-4--confirm-guard-configuration-matches-the-products-needs),
+with "branch" mapped to "property" or "portfolio region" in ZodiEstate's own
+admin navigation.
+
+ZodiEstate inherits the base engine's admin settings/branding, double-entry
+wallet ledger, 30+ payment gateway integrations, referral engine, KYC,
+i18n, cron, extension toggles, and CMS/page builder as-is — see
+[base-codebase-strategy.md](../../architecture/base-codebase-strategy.md#inherited-as-is-the-admin-engine-every-product-keeps).
+On top of that inherited engine, ZodiEstate adds its own domain modules
+(Properties, Leasing, Trust Accounting, Maintenance, Owner Portal, Tenant
+Relations) as new, clearly bounded Laravel modules per
+[`module-template.md`](../../templates/module-template.md), each
+registering its own permissions into the inherited `Role`/`Permission`
+system (never a parallel RBAC) per
+[`permission-template.md`](../../templates/permission-template.md).
+
+The trust ledger (security deposits, owner-designated funds) is
+purpose-built rather than reusing the inherited single wallet-balance
+engine directly: it is implemented as a dedicated `TrustLedgerContract`
+that enforces double-entry, append-only posting fully segregated from the
+operating ledger at the data-model level — see §27. This is a deliberate
+domain-specific extension on top of the inherited wallet/ledger pattern
+documented in
+[wallet-system.md](../../standards/wallet-system.md#what-a-products-domain-modules-do-with-this-engine),
+not a reimplementation of it: ordinary operating-account transactions
+(management fees, vendor payments) still post through the inherited
+`Transaction` model, while client/owner trust funds post exclusively
+through `TrustLedgerContract` so the two can never commingle in code.
+
+Each ZodiEstate deployment belongs to exactly one property management
+company or owner-operator, running on their own hosting with their own
+database — there is no shared platform, no `tenant_id` scoping, and no
+runtime dependency on any other Zodize product, per
+[single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md).
+A firm managing units on behalf of multiple external owners models that
+via the `owners` entity (§14), not via multi-tenancy; a firm structured as
+multiple legal entities (e.g. separate LLCs per property) uses the
+`company_id` multi-company scoping pattern from
+[localization-i18n.md](../../standards/localization-i18n.md#multi-company--multi-branch-data-scoping)
+if its own operations require it.
 
 ## 12. Technology
 

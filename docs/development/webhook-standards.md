@@ -10,12 +10,12 @@ consumers (in-app notification, email, webhook, audit log).
 
 ## Registration
 
-- A tenant registers a webhook endpoint with: target URL (HTTPS only), a
-  subset of event types to receive, and receives a generated signing secret
-  at creation time.
+- The buyer's own staff, from the admin panel, registers a webhook endpoint
+  with: target URL (HTTPS only), a subset of event types to receive, and
+  receives a generated signing secret at creation time.
 - Endpoints support multiple subscriptions with different event filters.
-- Endpoint health (recent delivery success rate) is visible in-product;
-  an endpoint is auto-disabled and the tenant notified after 100 consecutive
+- Endpoint health (recent delivery success rate) is visible in-product; an
+  endpoint is auto-disabled and the admin notified after 100 consecutive
   failures.
 
 ## Payload format
@@ -25,7 +25,6 @@ consumers (in-app notification, email, webhook, audit log).
   "id": "evt_01HXYZ...",
   "type": "invoice.paid",
   "created_at": "2026-07-31T12:00:00Z",
-  "tenant_id": "ten_...",
   "data": { "...": "the resource, matching the REST API representation" }
 }
 ```
@@ -53,7 +52,8 @@ snippets are published per [sdk-standards.md](./sdk-standards.md).
   exponential backoff — 1m, 5m, 30m, 2h, 12h — up to 24 hours, then marked
   failed and surfaced in the endpoint's delivery log.
 - Full delivery log (payload, response status, response body, timestamp) is
-  retained for 30 days and viewable/replayable by the tenant.
+  retained for 30 days and viewable/replayable by the admin from the
+  webhook endpoint's own admin screen.
 
 ## Ordering
 
@@ -66,5 +66,5 @@ of order.
 ## Versioning
 
 A webhook payload's `data` shape versions together with the REST API version
-the tenant's integration was created against; a breaking payload change
-requires a new API version per [api-standards.md](./api-standards.md#versioning).
+the integration was created against; a breaking payload change requires a
+new API version per [api-standards.md](./api-standards.md#versioning).

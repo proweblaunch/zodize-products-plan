@@ -16,7 +16,7 @@ a distinct purpose. A product MUST NOT invent a fourth.
 |---|---|---|---|
 | Toast | Transient, auto-dismisses | Reaction to the current user's own just-taken action | Immediate feedback: "Invoice created", "Undo" prompts, action confirmations, action failures. |
 | Notification center | Persistent until read/dismissed | Events relevant to the user, possibly triggered by someone/something else | Assignment, mentions, approvals needed, background job completion, another user's activity on a shared record. |
-| Banner | Persistent until resolved or dismissed, system-wide | Conditions affecting the whole tenant or the whole product, not one user's action | Maintenance windows, billing/plan issues, degraded service, required actions blocking the product (e.g. "Verify your email to continue"). |
+| Banner | Persistent until resolved or dismissed, system-wide | Conditions affecting the whole business or the whole product, not one user's action | Maintenance windows, licensing/plan issues, degraded service, required actions blocking the product (e.g. "Verify your email to continue"). |
 
 ### Toast (transient)
 

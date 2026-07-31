@@ -47,7 +47,7 @@ customer.
 | Power users | Command palette, keyboard shortcuts |
 | Intelligence | Report builder, dashboard builder, scheduled reports, forecasting where domain-relevant |
 | Operations | Health monitoring/system diagnostics for admins, license/seat management |
-| Platform | White-labeling, tenant/organization management, session management, rate-limited API, developer portal |
+| Platform | White-labeling, multi-company/multi-branch management (see [localization-i18n.md](../standards/localization-i18n.md#multi-company--multi-branch-data-scoping)), session management, rate-limited API, developer portal |
 
 A product spec that omits a row from this table without an explicit,
 justified exception is incomplete.
@@ -64,11 +64,12 @@ Oracle NetSuite, Toast, Epic/Cerner-class systems, depending on vertical).
 ## Multi-everything by default
 
 Every product must support multi-company, multi-branch, multi-currency, and
-multi-language operation from its data model up, per
+multi-language operation from its data model up — all scoped within the one
+business's single deployed instance, per
 [localization-i18n.md](../standards/localization-i18n.md) and
-[multi-tenancy.md](../architecture/multi-tenancy.md), because the enterprise
-customers Zodize targets operate across borders and subsidiaries by default,
-not as an edge case.
+[single-tenant-deployment-model.md](../architecture/single-tenant-deployment-model.md) —
+because the enterprise customers Zodize targets operate across borders and
+subsidiaries by default, not as an edge case.
 
 ## Definition of a good Zodize product decision
 

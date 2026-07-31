@@ -89,13 +89,13 @@ Zodize uses a hybrid validation timing model, applied per field type:
 - Server-side validation errors returned on submit MUST be mapped back to
   their specific field when the API response identifies a field (per the
   API error format in `docs/development/`); only truly form-level errors
-  (e.g. "This tenant has reached its account limit") render in a banner at
+  (e.g. "This plan has reached its record limit") render in a banner at
   the top of the form.
 
 ## Multi-step form / wizard pattern
 
 Used for long, sequential data-collection flows (e.g. onboarding a new
-tenant, opening a new account) that benefit from being broken into
+customer, opening a new account) that benefit from being broken into
 digestible stages rather than one long scroll.
 
 - A horizontal step indicator (numbered circles connected by a line) sits

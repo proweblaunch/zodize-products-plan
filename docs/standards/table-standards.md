@@ -117,7 +117,7 @@ from [`../design-system/components.md`](../design-system/components.md).
 
 Two distinct empty states MUST be distinguished:
 
-- **Zero records overall** (tenant has never created any): shows a centered
+- **Zero records overall** (the business has never created any): shows a centered
   illustration, a one-sentence explanation, and a primary "Create <entity>"
   button — matching the onboarding pattern in
   [`dashboard-standards.md`](./dashboard-standards.md#default-dashboard--never-empty).

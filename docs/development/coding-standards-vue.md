@@ -40,7 +40,9 @@
 ## State management rules
 
 - Local component state (`ref`/`reactive`) for anything not shared.
-- Pinia store for: current user/session, current tenant/org context,
+- Pinia store for: current user/session, current company/branch context on
+  a product that models multi-company/multi-branch operation (see
+  [localization-i18n.md](../standards/localization-i18n.md#multi-company--multi-branch-data-scoping)),
   permission set, feature flags, notification/toast queue, and any
   cross-route shared entity state.
 - Server state (API data) is not duplicated into a global store unless it
