@@ -8,6 +8,39 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed — ZodiCore: all 22 addon packages installed, verified, and documented as the true final state
+
+- Installed all 22 Ultimate POS addon packages under
+  `modulesfiles/Ultimate POS Addons/` on the live build VPS
+  (`/home/script/public_html/zodicore/`), resolving to **18 unique
+  modules** (4 zips were alternate variants of the same module — Advance
+  Accounting over base Accounting, CRM With-SaaS over Without-SaaS).
+  Followed the confirmed `nwidart/laravel-modules` method one addon at a
+  time (extract → `composer dump-autoload` → `module:enable` → migrate →
+  lint → confirm boot → commit), with each addon committed on its own to
+  the codebase's local git history. No addon-vs-addon conflict (route
+  collision, migration conflict, duplicate table) was found across all 22
+  packages.
+- Found and fixed three real bugs in the shipped addon code during
+  install: Accounting's DDL-in-transaction migration (MySQL auto-commits
+  around `ALTER TABLE`, breaking the migration), Gym's migration
+  `down()` dropping the wrong table, and — surfaced only by running the
+  full `php artisan test` suite — two unguarded/mismatched-guard global
+  function declarations (Accounting, InventoryManagement) that fatal with
+  "Cannot redeclare" whenever the app boots more than once in the same
+  PHP process, which Laravel's test runner does per test case.
+- Confirmed `modules_statuses.json` is unreliable as a source of truth:
+  it never reflected real install state at any point, lists 6 module
+  names with no corresponding addon package at all, and omits 2 real
+  installed modules (`InventoryManagement`, `Partners`).
+- Updated `docs/products/ZodiCore/SPEC.md`'s §11 (Architecture) and §13
+  (Modules & Submodules) and `BUILD_STATE.md`'s ZodiCore row and Flagged
+  Items with the final, true install record — per-addon install order,
+  the dependency-free finding, both variant-collision resolutions, all
+  three bugs fixed, and the `modules_statuses.json` unreliability
+  finding. The piracy-provenance concern from the prior pass remains
+  resolved per the product owner's scanned-and-confirmed-clean decision.
+
 ### Added — Zodize MCP Server build-VPS access; ZodiCore/ZodiTrack/ZodiBank verified-fact corrections
 
 - Resolved the previously-flagged environment blocker: the Zodize MCP

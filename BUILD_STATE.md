@@ -94,7 +94,7 @@ established this rule.
 |---|---|---|---|---|
 | ZodiTrack | `extending-existing` | Confirmed on disk at `script/public_html/zoditrack/`: native procedural PHP (mysqli, page-routed `.php` files) freight/shipment-tracking site with public tracking-number lookup, customer portal, and a 33-file admin back office (shipments, branches, staff, customers, vendors, invoices, reports). **Domain mismatch found**: `docs/products/ZodiTrack/SPEC.md` was written describing an ITAM/enterprise-asset-tracking tool, which does not match — see the correction notice added to that spec's §0 | 2026-07-31 | Read every file under `admin/` in full, rewrite SPEC.md §1–§7 to describe the real freight-tracking business, then populate a real gap list |
 | ZodiBank | `extending-existing` | Confirmed on disk at `script/public_html/zodibank/`: Laravel + `nwidart/laravel-modules`, built on "Pay Secure," with `Modules/Agent` and `Modules/Merchant` already present, and Authorize.Net/Flutterwave/CoinGate/CinetPay gateways already in `composer.json`. Confirmed absent (via code search): FDR, DPS, account-number generation, staff/branch management. FINCRA_INTEGRATION.md spec added, several Fincra API specifics flagged as needing live-docs verification (WebFetch to docs.fincra.com returned HTTP 403 in this session) | 2026-07-31 | Build FDR/DPS/account-number/staff/branch modules fresh; verify Fincra's exact auth/webhook header names against live docs before implementing the integration; audit Pay Secure's own wallet/ledger against `docs/standards/wallet-system.md`'s invariants before building on it |
-| ZodiCore | `blocked` | **Piracy-provenance blocker RESOLVED by product-owner decision**: the flagged packages (`nullcave.club` markers) were scanned and confirmed clean; proceed installing from the same files already in `modulesfiles/Ultimate POS Addons/`, no re-acquisition needed. Recorded here per instruction, alongside the original PR #6 findings (kept for the record, not retracted). **Still blocked** — not on the piracy question anymore, but because this session's Zodize MCP Server connection (the only source of filesystem/terminal access to `/home/script/public_html/zodicore/`) disconnected before any addon could be extracted. No install work (Steps 1–7 of the standard nwidart method) was performed in this pass — nothing beyond this doc update. Confirmed addon-install method and baseline commit (`460086a`) from the prior pass still stand | 2026-08-02 | A session with working Zodize MCP Server (or equivalent VPS) access must resume the install from scratch, addon by addon, in this order: (1) verify the baseline commit `460086a` still matches live disk state before touching anything: (2) resolve the Accounting/Advance-Accounting and CRM-With/Without-SaaS naming collisions and the Superadmin architecture question (queued, not yet decided) before or during the pass, since both variant pairs unzip to the same `Modules/` path; (3) install the 15 unambiguous modules one at a time per the confirmed method, each with its own commit |
+| ZodiCore | `extending-existing` | **All 22 addon packages installed and confirmed working** (18 unique modules — the other 4 zips are alternate/pre-extracted variants of the same modules, see the resolution note below). Install order followed dependency-free alphabetical-ish order since no addon's own docs stated a hard dependency on another (`Superadmin`, `Accounting` [Advance Accounting v1.3.1 chosen over base v0.8.5], `Essentials`/HRM, `AssetManagement`, `Cms`, `Crm` [With-SaaS-Compatibility variant chosen], `ProductCatalogue`, `AiAssistance`, `Gym`, `Hms`, `InventoryManagement`, `Manufacturing`, `Partners`, `Project`, `Repair`, `Spreadsheet`, `Woocommerce`, `Connector`). Two real latent bugs found in the shipped addon code and fixed (not addon-vs-addon conflicts): (1) Accounting's `2021_08_23_..._add_contact_and_location_id_to_journal_entries_table` migration wrapped DDL `ALTER TABLE` statements in `DB::transaction()`, which MySQL auto-commits around, breaking the migration — fixed by removing the transaction wrapper; (2) Gym's `create_packages_table` migration's `down()` dropped the wrong table (`packages` instead of `gym_packages`) — fixed. A third class of bug surfaced only by running the full `php artisan test` suite (not by individual per-addon smoke checks): Accounting's `Helpers/general_helper.php` and InventoryManagement's `start.php` each declare a global function without (or with a mismatched) `function_exists()` guard, which fatals with "Cannot redeclare" the moment the app boots more than once in the same PHP process (exactly what running the full test suite via `php artisan test` triggers, since Laravel's test runner rebuilds the application per test case) — all three instances found and fixed. `modules_statuses.json` confirmed **unreliable** as either an install-state indicator or a complete scope list: it never reflected real install state at any point in this pass (a stale demo/marketing artifact), lists 6 names with no corresponding addon package at all (`Ecommerce`, `FieldForce`, `InboxReport`, `CustomDashboard`, `ZatcaIntegrationKsa`, `Cheque`), and omits 2 real installed modules (`InventoryManagement`, `Partners`). Full test suite run clean of fatal errors after the fixes; the only remaining test failure is Laravel's own stock `Tests/Feature/ExampleTest.php` (`GET /` expects 200, gets 404) — pre-existing scaffold boilerplate, not caused by any addon. The piracy-provenance concern (`nullcave.club` zip-archive-comment markers, also present on the Connector.zip used in this pass) remains resolved per the product owner's scanned-and-confirmed-clean decision recorded below | 2026-08-02 | Proceed to the ERP feature-gap analysis (what a complete ERP still needs beyond these 18 unique installed addon modules), now that the install record is accurate; separately, the 3 known pre-existing Ultimate POS bugs noted in `docs/products/ZodiCore/SPEC.md` (cheque due-date field, language-spacing bug, customer/supplier creation error) and the parallel non-blocking piracy-marker verification task below remain outstanding and unrelated to this pass |
 | ZodiCapital | `extending-existing` | Confirmed on disk at `novavest/public_html/core/`: Laravel app, same `assets/`+`core/` structural split as the qfsfountains-lineage convention. Exact existing feature set (app/ contents, migrations) NOT yet audited — only the directory shape and Laravel identity are confirmed | 2026-07-31 | Audit `novavest/core/app/` and `novavest/core/database/migrations/` against `docs/products/ZodiCapital/SPEC.md` to produce a concrete gap list before building new modules — coordinate with ZodiYield's session, same codebase |
 | ZodiYield | `extending-existing` | Same novavest/core base as ZodiCapital (see above); same audit-not-yet-done caveat | 2026-07-31 | Same novavest audit as ZodiCapital — do not duplicate; check whether ZodiCapital's session already ran it first |
 | ZodiBusiness | `not-started` | Not begun — first in build order (`ROADMAP.md` #1), reference pipeline product | 2026-07-31 | Clone sanitized base to `/home/script/public_html/zodibusiness/`, run `product-genericization-checklist.md` |
@@ -125,6 +125,109 @@ meaningful (a full rewrite of the spec's Vision/Purpose/Personas sections,
 which currently describe the wrong business domain entirely).
 
 ## Flagged Items
+
+### 2026-08-02 (RESOLVED) — ZodiCore: all 22 addon packages installed; 3 real bugs found and fixed; `modules_statuses.json` confirmed unreliable
+
+Following the product owner's confirmation to proceed with the standard
+`nwidart/laravel-modules` install method (per the resolution below) and
+with working Zodize MCP Server access restored, all 22 addon packages
+under `modulesfiles/Ultimate POS Addons/` were installed one at a time —
+extract to `Modules/<Name>/`, `composer dump-autoload`,
+`php artisan module:enable <Name>`, run migrations, lint (`php -l`),
+confirm the app still boots, commit — with each addon committed on its
+own to `/home/script/public_html/zodicore`'s local git repository
+(no GitHub remote configured for that repo; baseline `460086a`,
+final commit as of this pass includes the Connector install plus the
+test-suite bugfix commit).
+
+**Final unique module count: 18**, not 22 — 4 of the 22 zips are
+alternate variants of the same module and only one of each pair was
+installed:
+- `Accounting` (base, v0.8.5) vs `Advance Accounting` (v1.3.1) — **Advance
+  Accounting installed**, the newer/superset variant.
+- `Crm` Without-SaaS vs `Crm` With-SaaS-Compatibility — **With-SaaS
+  variant installed**, since it is the strict superset.
+
+No addon's own shipped documentation stated a hard dependency on another
+addon (checked each "Getting Started" PDF and each package's own
+`composer.json`/migration contents for cross-module foreign keys before
+installing); install order was therefore not constrained by a dependency
+chain, and no addon-vs-addon conflict (route collision, migration
+conflict, duplicate table name) was found across all 22 packages.
+
+**Two real bugs in the shipped addon code itself** (not conflicts between
+addons) were found and fixed during individual installs:
+1. Accounting's `2021_08_23_175321_add_contact_and_location_id_to_journal_entries_table.php`
+   wrapped its `ALTER TABLE` DDL statements in `DB::transaction()`; MySQL/
+   MariaDB auto-commits around DDL, which broke Laravel's migration
+   bookkeeping. Fixed by removing the transaction wrapper and manually
+   reconciling the `migrations` table row.
+2. Gym's `2024_11_18_150455_create_packages_table.php` migration's
+   `down()` called `Schema::dropIfExists('packages')` — the wrong table;
+   `up()` correctly created `gym_packages` (no collision with
+   Superadmin's own `packages` table), but the rollback would have
+   destroyed Superadmin's table instead of Gym's own. Fixed to
+   `dropIfExists('gym_packages')`.
+3. Spreadsheet's `Resources/lang/nl/lang.php` shipped with a corrupted
+   array literal (`'spreadsheet' => 'Spreadsheet',Spreadsheet` — stray
+   text appended with no quotes) that a lint check would have caught, but
+   didn't, because that commit chained the lint step with `;` instead of
+   `&&` before `git commit` — a process mistake, not an addon bug per se.
+   Fixed in a follow-up commit; a full `php -l` sweep of all previously
+   committed modules afterward found no other syntax errors from the same
+   process mistake.
+
+**A third class of bug surfaced only by running the full `php artisan
+test` suite** (task step 5), not by the per-addon `php -l`/migrate-status/
+`php artisan about` smoke checks used after each individual install:
+Laravel's test runner re-bootstraps the entire application once per test
+case. `nwidart/laravel-modules`' `Module::registerFiles()` (in
+`vendor/nwidart/laravel-modules/src/Module.php`) uses `include` (not
+`include_once`) to load each module's `module.json`-declared `files`
+array — so any procedurally-declared global function in one of those
+files that isn't wrapped in `function_exists()` fatals with "Cannot
+redeclare" the moment the app boots a second time in the same PHP
+process. Found and fixed:
+- `Accounting/Helpers/general_helper.php`: `accounting()` was the one
+  function in the file with no guard at all (every sibling function in
+  the same file has one).
+- `Accounting/Helpers/general_helper.php`: `get_days_past()` was guarded
+  by `function_exists('get_date_range')` — the wrong function name (a
+  copy-paste bug; `get_date_range` is never declared anywhere, so the
+  guard never actually triggered).
+- `InventoryManagement/start.php`: `inventorymanagement1()` had no guard.
+
+`InventoryManagement/Helpers/general_helper.php`'s similarly-unguarded
+`inventorypos()` was left untouched — confirmed it is dead code, not
+referenced by that module's `module.json` `files` array or its
+`composer.json` autoload, so it is never procedurally included and can't
+trigger this bug.
+
+After these fixes, `php artisan test` runs with no fatal errors; the only
+remaining failure is Laravel's own stock `Tests/Feature/ExampleTest.php`
+(`GET /` expects HTTP 200, receives 404) — pre-existing framework
+scaffold boilerplate present since project creation, unrelated to any of
+the 22 addons, and out of scope for this pass to fix.
+
+**`modules_statuses.json` confirmed unreliable**, closing the open
+question from the prior pass: it never once reflected the real on-disk
+`Modules/` state at any point during this install (a stale artifact,
+most plausibly baked into Ultimate POS's own demo/marketing build). Of
+its 22 listed names, 6 have no corresponding addon package anywhere in
+`modulesfiles/Ultimate POS Addons/` (`Ecommerce`, `FieldForce`,
+`InboxReport`, `CustomDashboard`, `ZatcaIntegrationKsa`, `Cheque`), and 2
+real installed modules aren't listed in it at all (`InventoryManagement`,
+`Partners`). This file must not be trusted as a source of truth for
+ZodiCore's module state going forward — `php artisan module:list` against
+the live codebase is the only reliable check.
+
+The `nullcave.club` zip-archive-comment marker (see the piracy-provenance
+entry immediately below) was also present on `Connector.zip`, installed
+in this pass under the already-resolved decision (scanned and confirmed
+clean, no re-acquisition) — no additional marker *files* (HTML redirects,
+`readme!.html`, etc.) were found inside any of the 22 extracted addons'
+actual contents, only the same zip-comment-metadata pattern already
+documented.
 
 ### 2026-08-02 (RESOLVED by product-owner decision) — ZodiCore: `modulesfiles/Ultimate POS Addons/` sourced from a piracy redistributor ("nullcave.club")
 
