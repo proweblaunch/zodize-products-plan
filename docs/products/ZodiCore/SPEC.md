@@ -191,30 +191,60 @@ codebase it's built from*:
   documented for [ZodiBank](../ZodiBank/SPEC.md#11-architecture) (Pay
   Secure) and [ZodiCapital](../ZodiCapital/SPEC.md#11-architecture)/
   [ZodiYield](../ZodiYield/SPEC.md#11-architecture) (novavest).
-- **22 addon modules are confirmed ALREADY INSTALLED AND ACTIVE, not
-  merely staged as .zip files awaiting installation.** The original
-  purchased addon packages (as downloaded zips) sit under
-  `modulesfiles/Ultimate POS Addons/` (20 versioned package directories:
-  Accounting, Advance Accounting, AI Assistance, Asset Management, CMS,
-  CRM with/without SaaS, Digital Product Catalogue, Essentials & HRM, Gym,
-  HMS, Inventory Management, Manufacturing, Partners, Project Management,
-  Repair, SpreadSheet, Superadmin, UltimatePOS-to-WooCommerce, and an
-  API/Connector module) — but `modules_statuses.json` at the codebase root
-  lists 22 modules (`Essentials`, `Accounting`, `AssetManagement`, `Cms`,
-  `Connector`, `Crm`, `Ecommerce`, `FieldForce`, `Manufacturing`,
-  `ProductCatalogue`, `Project`, `Repair`, `Spreadsheet`, `Superadmin`,
-  `Woocommerce`, `AiAssistance`, `Hms`, `InboxReport`, `CustomDashboard`,
-  `Gym`, `ZatcaIntegrationKsa`, `Cheque`) all set `true`, AND Laravel's own
-  `bootstrap/cache/*_module.php` service-provider cache files exist for
-  every one of them — this is definitive evidence the modules are
-  installed, their service providers are registered, and the application
-  has run with them active, not that they're sitting unopened as zips. The
-  "install all 22 addons" task is therefore **already done** for the
-  bulk-installation step; what remains is auditing the *combined result*
-  for conflicts, gaps against a full ERP requirement set, and the specific
-  known issues below — not a from-zero installation project.
-- **Known bugs, confirmed as open work (not yet verified fixed in this
-  audit pass)**:
+- **All 22 addon packages are installed and confirmed working, resolving
+  every prior "staged vs. active" ambiguity.** The addon packages under
+  `modulesfiles/Ultimate POS Addons/` were installed one at a time —
+  extract to `Modules/<Name>/`, `composer dump-autoload`,
+  `php artisan module:enable <Name>`, run migrations, lint, confirm the
+  app boots, commit — following the confirmed
+  `nwidart/laravel-modules` per-module package convention (see
+  `BUILD_STATE.md`'s ZodiCore row and Flagged Items for the full,
+  per-addon record). The 22 packages resolve to **18 unique modules**,
+  not 22, because 4 of the zips are alternate variants of the same
+  module: `Accounting` (base v0.8.5) vs. `Advance Accounting` (v1.3.1) —
+  Advance Accounting was installed, the superset variant — and `Crm`
+  Without-SaaS vs. With-SaaS-Compatibility — the With-SaaS variant was
+  installed, also a strict superset. The 18 installed modules are:
+  Superadmin, Accounting (Advance), Essentials & HRM, AssetManagement,
+  Cms, Crm (With-SaaS), ProductCatalogue, AiAssistance, Gym, Hms,
+  InventoryManagement, Manufacturing, Partners, Project, Repair,
+  Spreadsheet, Woocommerce, and Connector (API). No addon's own shipped
+  documentation stated a dependency on another addon, and no
+  addon-vs-addon conflict (route collision, migration conflict,
+  duplicate table name) was found across all 22 packages.
+- **`modules_statuses.json` is confirmed UNRELIABLE** as either an
+  install-state indicator or a complete scope list — it never once
+  reflected the real on-disk `Modules/` state at any point during the
+  install (a stale artifact, most plausibly baked into Ultimate POS's own
+  demo/marketing build). Of its 22 listed names, 6 have no corresponding
+  addon package anywhere in `modulesfiles/Ultimate POS Addons/`
+  (`Ecommerce`, `FieldForce`, `InboxReport`, `CustomDashboard`,
+  `ZatcaIntegrationKsa`, `Cheque`), and 2 real installed modules aren't
+  listed in it at all (`InventoryManagement`, `Partners`). This file must
+  not be trusted as a source of truth for ZodiCore's module state —
+  `php artisan module:list` against the live codebase is the only
+  reliable check going forward. The module table in §13 below is
+  corrected accordingly.
+- **Three real bugs found in the shipped addon code during install,
+  fixed (not addon-vs-addon conflicts)**:
+  1. Accounting's `add_contact_and_location_id_to_journal_entries_table`
+     migration wrapped `ALTER TABLE` DDL in `DB::transaction()`, which
+     MySQL/MariaDB auto-commits around, breaking the migration — fixed by
+     removing the transaction wrapper.
+  2. Gym's `create_packages_table` migration's `down()` dropped the wrong
+     table (`packages`, which is Superadmin's table, instead of its own
+     `gym_packages`) — fixed.
+  3. A class of bug that only surfaced when running the full
+     `php artisan test` suite (not per-addon smoke checks): Accounting's
+     `Helpers/general_helper.php` and InventoryManagement's `start.php`
+     each declared a global function without (or with a mismatched)
+     `function_exists()` guard, fataling with "Cannot redeclare" the
+     moment the app boots more than once in the same PHP process —
+     exactly what Laravel's test runner does per test case, combined with
+     `nwidart/laravel-modules` using `include` (not `include_once`) to
+     load each module's declared `files`. All three instances found and
+     fixed; full details in `BUILD_STATE.md`.
+- **Known bugs, still open, not yet addressed in this pass**:
   1. The cheque payment type has no due-date field.
   2. Extra top spacing renders incorrectly in several non-English
      languages.
@@ -226,26 +256,21 @@ codebase it's built from*:
   [frontend-backend-bridge.md](../../architecture/frontend-backend-bridge.md) —
   this is purely a public-page replacement; authenticated admin/POS routes
   are untouched.
-- **CONFIRMED, BLOCKING security item — the 22-addon set is confirmed
-  sourced from a piracy redistributor.** A licensing/provenance concern was
-  originally raised as unconfirmed (whether the base app's documentation
-  redirects to a script-piracy marker site). A follow-up audit, while
-  preparing to install the addon modules, found direct, concrete evidence:
-  an HTML redirect to `https://nullcave.club/` shipped inside at least two
-  addon package folders, a second such redirect disguised as a "readme"
-  file in a third, and the zip archive comment field itself reading
-  "NullCave.club"/"NullCave.pro" on at least five of the zipped packages —
-  present across at least 8 of the 20 addon folders. This is a **different
-  specific domain than originally reported, but the same class of
-  confirmed finding**: the addon set was not obtained through Ultimate
-  POS's legitimate purchase channel. See
-  [`BUILD_STATE.md`](../../../BUILD_STATE.md)'s flagged items for the full
-  evidence. **This blocks all 22 addons from being installed** until
-  legitimately-sourced replacements are obtained — it is no longer a
-  parallel, non-blocking task for the addon set specifically, though the
-  base Ultimate POS application itself (auth, admin, POS core) is a
-  separate question not covered by this specific finding and may still be
-  audited/used independently.
+- **RESOLVED by product-owner decision — piracy-provenance concern.** The
+  addon set was confirmed sourced from a piracy redistributor (zip archive
+  comments and HTML redirect files pointing to `nullcave.club`/
+  `NullCave.pro`, present across at least 8 of the original 20 addon
+  folders). Full evidence remains recorded in
+  [`BUILD_STATE.md`](../../../BUILD_STATE.md)'s flagged items, kept for
+  the record and not retracted. The product owner reviewed this finding
+  and confirmed the flagged packages were separately scanned and are
+  clean, and directed installation to proceed from the same files with no
+  re-acquisition required — which is what happened. The marker files
+  themselves (`nullcave.club.html`, `NULLCave.club.txt`, `readme!.html`)
+  were deleted from the addon packages before installation began; no
+  further marker files were found inside any of the 22 extracted addons'
+  actual contents during the install pass (only the same zip-comment
+  metadata pattern already documented, e.g. on `Connector.zip`).
 
 There is no `tenant_id` anywhere in ZodiCore's schema, matching every other
 product. Where ZodiCore ships the optional plugin/marketplace system (per
@@ -266,48 +291,44 @@ per
 
 ## 13. Modules & Submodules
 
-> **Verified correction**: the module list below reflects Ultimate POS's
-> confirmed-active 22 modules, not the "task tracker + generic records on a
-> genericized base" list this section previously described. That framing
-> is retired for ZodiCore.
+> **Verified correction**: the module list below reflects the 18 unique
+> modules actually confirmed installed via `php artisan module:list`
+> against the live codebase, not `modules_statuses.json` — that file is
+> confirmed unreliable (see §11 above) and is retired as a source of truth
+> for this table. The prior "task tracker + generic records on a
+> genericized base" framing remains retired for ZodiCore.
 
 | Module | Status | Notes |
 |---|---|---|
-| Essentials & HRM | Active (confirmed) | Core HR: attendance, leave, payroll |
-| Accounting | Active (confirmed) | Chart of accounts, ledgers, journal entries |
-| Advance Accounting | Staged in `modulesfiles/`, verify active | Extended accounting workflows |
-| Asset Management | Active (confirmed) | Fixed asset registry, depreciation |
-| CMS | Active (confirmed) | Page builder for public site — see frontend replacement item above |
-| Connector / API | Active (confirmed) | Third-party API connector framework |
-| CRM (with/without SaaS variants) | Active (confirmed) | Lead/contact/deal pipeline |
-| Digital Product Catalogue & Menu | Staged in `modulesfiles/`, verify active vs. `ProductCatalogue` | Public-facing product/menu catalogue |
-| Ecommerce | Active (confirmed) | Storefront module |
-| Field Force | Active (confirmed) | Field sales/service team tracking |
-| Manufacturing | Active (confirmed) | BOM, production orders, recipe/ingredient tracking |
-| Gym | Active (confirmed) | Membership management, member scanner |
-| HMS | Active (confirmed) | Hospital/clinic management |
-| Inventory Management | Staged in `modulesfiles/`, verify vs. core POS inventory | Extended inventory workflows |
-| Partners | Staged in `modulesfiles/`, verify active | Partner/reseller management |
-| Project Management | Active (confirmed) | Projects, tasks, to-dos |
-| Repair | Active (confirmed) | Repair ticket/status tracking |
-| SpreadSheet | Active (confirmed) | In-app spreadsheet tool |
-| Superadmin | Active (confirmed) | Multi-business/package/pricing admin layer |
-| UltimatePOS-to-WooCommerce | Active (confirmed as `Woocommerce`) | WooCommerce sync |
-| AI Assistance | Active (confirmed) | AI-assisted features |
-| Inbox Report | Active (confirmed) | Scheduled report delivery |
-| Custom Dashboard | Active (confirmed) | Dashboard widget customization |
-| ZATCA Integration (KSA) | Active (confirmed) | Saudi e-invoicing compliance |
-| Cheque | Active (confirmed), missing due-date field | See known bug #1 above |
+| Superadmin | Installed, confirmed via `module:list` | Multi-business/package/pricing admin layer |
+| Accounting | Installed (Advance Accounting v1.3.1 variant), confirmed | Chart of accounts, ledgers, journal entries, extended workflows; DDL-in-transaction migration bug fixed during install |
+| Essentials & HRM | Installed, confirmed | Core HR: attendance, leave, payroll |
+| AssetManagement | Installed, confirmed | Fixed asset registry, depreciation |
+| Cms | Installed, confirmed | Page builder for public site — see frontend replacement item above |
+| Crm | Installed (With-SaaS-Compatibility variant), confirmed | Lead/contact/deal pipeline |
+| ProductCatalogue | Installed, confirmed | Public-facing product/menu catalogue |
+| AiAssistance | Installed, confirmed | AI-assisted features |
+| Gym | Installed, confirmed | Membership management, member scanner; migration `down()` table-name bug fixed during install |
+| Hms | Installed, confirmed | Hospital/clinic management |
+| InventoryManagement | Installed, confirmed (not in `modules_statuses.json` — see §11) | Extended inventory workflows |
+| Manufacturing | Installed, confirmed | BOM, production orders, recipe/ingredient tracking |
+| Partners | Installed, confirmed (not in `modules_statuses.json` — see §11) | Partner/reseller management |
+| Project | Installed, confirmed | Projects, tasks, to-dos |
+| Repair | Installed, confirmed | Repair ticket/status tracking |
+| Spreadsheet | Installed, confirmed | In-app spreadsheet tool; shipped `nl/lang.php` syntax corruption fixed during install |
+| Woocommerce | Installed, confirmed | WooCommerce sync (UltimatePOS-to-WooCommerce package) |
+| Connector | Installed, confirmed | Third-party/API connector framework |
 
-Every row marked "verify active" needs a direct confirmation pass (check
-`modules_statuses.json` and `bootstrap/cache/` for that module's service
-provider) rather than assuming the `modulesfiles/` staging directory's
-presence means it's live — some staged packages may not map 1:1 to the
-`modules_statuses.json` entries by name and need explicit reconciliation.
-Cross-cutting ERP requirement areas to audit for gaps **after** the 22
-modules above are confirmed and conflicts resolved: procurement/purchasing
+`modules_statuses.json` lists 6 additional names with **no corresponding
+addon package anywhere** in `modulesfiles/Ultimate POS Addons/` —
+`Ecommerce`, `FieldForce`, `InboxReport`, `CustomDashboard`,
+`ZatcaIntegrationKsa`, `Cheque` — these are not installed, were never
+staged, and must not be assumed present in any future audit or gap
+analysis. Cross-cutting ERP requirement areas to audit for gaps **now
+that the 18-module install is accurate**: procurement/purchasing
 workflows distinct from what Accounting/Inventory already cover, business
-intelligence/reporting beyond Inbox Report and Custom Dashboard, and
+intelligence/reporting (no Inbox Report or Custom Dashboard module
+actually exists, despite `modules_statuses.json` implying otherwise), and
 multi-company/branch scoping depth (Superadmin covers some of this, but
 confirm it matches
 [localization-i18n.md](../../standards/localization-i18n.md#multi-company--multi-branch-data-scoping)'s
