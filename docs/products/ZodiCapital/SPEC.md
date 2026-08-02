@@ -8,18 +8,47 @@
 > this document. See [PRODUCT_CATALOG.md](../../../PRODUCT_CATALOG.md) for
 > spec status definitions.
 
-ZodiCapital is a standalone, self-hosted Laravel application built by
-cloning the sanitized [base codebase](../../architecture/base-codebase-strategy.md),
-running the
-[genericization checklist](../../architecture/product-genericization-checklist.md)
-to strip the base engine's banking-specific loan/DPS/FDR/branch tables, and
-layering fund-management-domain modules on top. It does not depend on any
+Unlike most other products in the catalog, ZodiCapital is **not** built by
+cloning the sanitized [base codebase](../../architecture/base-codebase-strategy.md)
+(the qfsfountains-sourced "ViserBank/ViserLab Core Engine") through the
+standard [genericization checklist](../../architecture/product-genericization-checklist.md)
+pipeline. A direct filesystem audit of the build server confirmed an
+existing Laravel codebase at `/home/novavest/public_html/core/` — complete
+with `app/`, `artisan`, `composer.json`, `bootstrap/`, `config/`,
+`database/`, `resources/`, `routes/`, `storage/`, `vendor/`, and a
+`.env`/`.env.example` — sitting alongside a `/home/novavest/public_html/assets/`
+directory. That `assets/` + `core/` split is the same structural convention
+[base-codebase-strategy.md](../../architecture/base-codebase-strategy.md#directory-structure)
+documents for the qfsfountains base, a strong signal this "novavest"
+codebase is itself Zodize-lineage rather than an unrelated third codebase,
+even though its `composer.json` still carries the generic `laravel/laravel`
+boilerplate package name and its `README.md` is unmodified Laravel
+boilerplate — neither file confirms a specific product identity on its own.
+ZodiCapital is therefore based on and improved from novavest/core, similar
+in spirit to how ZodiBank is built on "Pay Secure" instead of the
+qfsfountains base (see [ZodiBank's SPEC.md §11](../ZodiBank/SPEC.md#11-architecture))
+— a deliberate, documented exception to the standard "every product clones
+qfsfountains" pipeline, not a contradiction of it. Unlike Pay Secure,
+however, novavest is not a shipped/sold commercial product; it is an
+existing internal build, so this is more accurately "extend an existing
+internal codebase" than "Live — Extend Only" in the sense
+[BUILD_STATE.md](../../../BUILD_STATE.md) uses for ZodiTrack. See
+[Open Questions](#open-questions) for what a follow-up session must still
+audit before building on top of it. ZodiCapital does not depend on any
 other Zodize product or on a central "ZodiCore" platform for identity,
 billing, notifications, or tenancy — see
 [single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md).
 `ZodiCore` is itself just another standalone product in the catalog (a
 general-purpose back-office/ERP starter), not a platform ZodiCapital runs
 on.
+
+**Shared foundation with ZodiYield**: [ZodiYield](../ZodiYield/SPEC.md) is
+also based on and improved from the same novavest/core codebase. A session
+working on either product's novavest-derived infrastructure (RBAC, KYC,
+wallet/ledger, or any shared scaffolding novavest already provides) MUST
+check [ZodiYield's SPEC.md §11](../ZodiYield/SPEC.md#11-architecture) and
+this document's own audit findings first, so the two products don't
+independently reinvent overlapping novavest infrastructure.
 
 ## 1. Vision
 
@@ -176,36 +205,66 @@ inherited baseline. ZodiCapital-specific additions:
 
 ## 11. Architecture
 
-ZodiCapital is built by cloning the sanitized
-[base codebase](../../architecture/base-codebase-strategy.md) — a single,
-independent Laravel application the buyer deploys entirely on their own
-shared/VPS hosting, per
-[single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md).
-Building ZodiCapital means running the full
-[genericization checklist](../../architecture/product-genericization-checklist.md):
-the inherited `loans`/`dps`/`fdr`/`branches`/`other_banks` tables and
-controllers are stripped (they do not apply to fund management), and
-ZodiCapital keeps and builds on top of the base engine's RBAC/auth
-(`Role`/`Permission` models), KYC, i18n, and admin configuration surface
-(see
-[base-codebase-strategy.md](../../architecture/base-codebase-strategy.md#inherited-as-is-the-admin-engine-every-product-keeps)).
+ZodiCapital is based on and improved from the existing "novavest" Laravel
+application at `/home/novavest/public_html/core/`, a single, independent
+codebase the buyer deploys entirely on their own shared/VPS hosting, per
+[single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md)
+— **not** a clone of the sanitized
+[base codebase](../../architecture/base-codebase-strategy.md) run through
+the [genericization checklist](../../architecture/product-genericization-checklist.md),
+as most other products are. This was confirmed by a direct filesystem audit
+of the build server: novavest/core has the standard Laravel skeleton
+(`app/`, `artisan`, `composer.json`, `bootstrap/`, `config/`, `database/`,
+`resources/`, `routes/`, `storage/`, `vendor/`) and a sibling
+`novavest/assets/` directory, matching the same `assets/` + `core/` split
+[base-codebase-strategy.md](../../architecture/base-codebase-strategy.md#directory-structure)
+documents for the qfsfountains base — meaning novavest is very likely
+Zodize-lineage itself, not a from-scratch third codebase, even though
+neither its `README.md` (unmodified Laravel boilerplate) nor its
+`composer.json` (generic `laravel/laravel` package name) confirms a
+specific prior product identity.
 
-On that foundation, ZodiCapital adds its own domain modules — Fund
+**What the audit has and has not established.** The audit confirmed
+novavest/core's directory shape and Laravel/framework identity. It did
+**not** deeply inspect `novavest/core/app/` or
+`novavest/core/database/migrations/` against ZodiCapital's own fund-
+management requirements (§9, §14) — whether novavest already has RBAC/auth
+(`Role`/`Permission` models), KYC, wallet/ledger, or any fund-structure,
+capital-call, distribution, NAV, or investor-portal functionality is
+unknown until that audit runs. See [Open Questions](#open-questions). Do
+**not** assume novavest lacks these systems and rebuild them from the
+qfsfountains base's inherited-engine list — that would risk building
+duplicate infrastructure on top of a codebase that may already have its
+own. Equally, do not assume novavest already covers ZodiCapital's fund
+mechanics without checking; the correct next step is a concrete gap list
+(spec requirement → present/absent in novavest), the same audit-before-build
+approach [BUILD_STATE.md](../../../BUILD_STATE.md) documents for ZodiTrack's
+Live-Extend-Only status, adapted here for an existing internal codebase
+rather than an already-shipped product.
+
+Once that gap list exists, ZodiCapital's own domain modules — Fund
 Structures, Capital Calls, Distributions, NAV & Valuation, Investor Portal,
-Performance Reporting, Compliance, and Subscription & E-Signature — as new,
-clearly bounded modules per
-[module-template.md](../../templates/module-template.md), registering into
-the inherited audit log and RBAC policy registry rather than building
-parallel systems. The investor portal is a restricted-scope view within the
-same single-business deployment the GP manages, using the inherited RBAC
-engine to scope each LP to only their own capital account and fund-level
-public documents, never another LP's data — this is ordinary
-row-level-authorization, not tenant isolation, since there is exactly one
-fund manager's deployment. ZodiCapital has no runtime dependency on any
-other Zodize product or on a Zodize-operated central service; the only
-external dependencies are the third-party e-signature, accreditation
-verification, and valuation-data integrations the buyer's own fund manager
-configures (§22).
+Performance Reporting, Compliance, and Subscription & E-Signature — are
+added as new, clearly bounded modules per
+[module-template.md](../../templates/module-template.md), reusing whatever
+RBAC/audit/KYC/wallet infrastructure the audit finds already present in
+novavest rather than building parallel systems, and building fresh only
+what the gap list shows is actually missing. The investor portal is a
+restricted-scope view within the same single-business deployment the GP
+manages, scoping each LP to only their own capital account and fund-level
+public documents, never another LP's data, via whichever RBAC mechanism the
+audit confirms novavest provides — this is ordinary row-level-authorization,
+not tenant isolation, since there is exactly one fund manager's deployment.
+ZodiCapital has no runtime dependency on any other Zodize product or on a
+Zodize-operated central service; the only external dependencies are the
+third-party e-signature, accreditation verification, and valuation-data
+integrations the buyer's own fund manager configures (§22).
+
+**Shared foundation with ZodiYield**: both ZodiCapital and
+[ZodiYield](../ZodiYield/SPEC.md) are based on and improved from this same
+novavest/core codebase. A future session auditing novavest's `app/` or
+`database/migrations/` for one product SHOULD share findings with the
+other's SPEC.md rather than re-running the same filesystem audit twice.
 
 ## 12. Technology
 
@@ -241,6 +300,19 @@ one fund manager, per
 A fund manager running multiple funds within their one deployment models
 that as multiple `funds` rows scoped by `fund_id` throughout, not as
 tenancy.
+
+**These entities describe what ZodiCapital needs, not what novavest already
+has.** They were designed against ZodiCapital's own functional requirements
+(§9), not against novavest's actual existing schema — novavest's
+`database/migrations/` has not yet been audited (see
+[Open Questions](#open-questions)). Before finalizing any new migration for
+the tables below, a session with real access to
+`novavest/core/database/migrations/` MUST check for overlap: novavest may
+already have equivalent (or partially equivalent) fund, investor, capital-
+account, or ledger tables under different names, in which case the correct
+move is to extend or rename what exists rather than create a duplicate
+table alongside it. Treat every table name below as a proposal pending that
+audit, not as confirmed net-new schema.
 
 | Entity | Key columns |
 |---|---|
@@ -537,16 +609,46 @@ before go-live.
 - Automated benchmark comparison against third-party vintage-year
   performance data feeds.
 
+## Open Questions
+
+- **Novavest's exact existing feature set needs a deeper audit.** The
+  filesystem audit backing §11 confirmed `/home/novavest/public_html/core/`
+  is a Laravel application with the standard `assets/` + `core/` structural
+  split, but it did not inspect `novavest/core/app/` or
+  `novavest/core/database/migrations/` in depth. A follow-up session MUST
+  audit both against this SPEC.md's requirements (§9 Functional
+  Requirements, §14 Core Data Model) — fund structures, capital calls,
+  distributions, NAV calculation, investor portal, RBAC/auth, KYC, and
+  wallet/ledger — and produce a concrete gap list (requirement → present/
+  absent/partial in novavest) before any new migration or module is built.
+  Until that audit runs, treat every "novavest already has X" or "ZodiCapital
+  must build Y fresh" statement in this document as unverified against the
+  real codebase, not as a completed audit result.
+- **Overlap with ZodiYield's own novavest audit.** Because
+  [ZodiYield](../ZodiYield/SPEC.md) shares the same novavest/core
+  foundation, whichever session performs the novavest audit first SHOULD
+  record shared findings (RBAC, KYC, wallet/ledger, or any other
+  cross-cutting infrastructure novavest already provides) somewhere both
+  specs can reference, so the second product's audit doesn't repeat work
+  already done for the first.
+
 ## Roadmap (spec depth)
 
 This spec's Architecture and Core Data Model sections were revised to
 reflect the corrected standalone, self-hosted, single-tenant deployment
 model — see
 [single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md)
-and [base-codebase-strategy.md](../../architecture/base-codebase-strategy.md).
-This spec is Foundation-depth. Queued for Deep-depth expansion: a full ER
-diagram and migration set for the fund/capital-account/waterfall schema
-(companion `DATA_MODEL.md`), a complete endpoint catalog including the full
-investor portal surface (companion `API_REFERENCE.md`), and a full report
-catalog covering additional fund-type-specific reporting (real assets,
-fund-of-funds). Changes follow [CONTRIBUTING.md](../../../CONTRIBUTING.md).
+and [base-codebase-strategy.md](../../architecture/base-codebase-strategy.md)
+— and subsequently revised again to reflect the verified ground truth that
+ZodiCapital is based on and improved from the existing novavest/core
+codebase (see §11) rather than cloned from the sanitized qfsfountains base,
+a deliberate exception to the standard pipeline documented alongside
+ZodiBank's equivalent "Pay Secure" exception. This spec is Foundation-depth.
+Queued for Deep-depth expansion, now gated on the novavest audit in
+[Open Questions](#open-questions): a full ER diagram and migration set for
+the fund/capital-account/waterfall schema reconciled against whatever
+novavest already has (companion `DATA_MODEL.md`), a complete endpoint
+catalog including the full investor portal surface (companion
+`API_REFERENCE.md`), and a full report catalog covering additional
+fund-type-specific reporting (real assets, fund-of-funds). Changes follow
+[CONTRIBUTING.md](../../../CONTRIBUTING.md).

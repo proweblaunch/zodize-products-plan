@@ -158,77 +158,155 @@ new modules (tasks, records) are ordinary CRUD workloads.
 
 ## 11. Architecture
 
-ZodiCore is a standalone, self-hosted Laravel application, sold as source
-code to one buyer and deployed entirely within that buyer's own hosting
-account, exactly like every other Zodize product — there is no shared
-platform service and no other Zodize product it depends on at runtime
-([single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md)).
-Earlier drafts of this handbook described ZodiCore as "the platform every
-other Zodize product is built on," providing shared identity, billing,
-notifications, and tenancy that every other product called over the
-network. **That model is retired and MUST NOT be assumed anywhere in this
-handbook.** ZodiCore does not run as a service other products call; it does
-not provision, suspend, or manage any other product's deployment; and no
-other product has a runtime dependency on it.
+> **Verified correction, supersedes the "clone the sanitized base" framing
+> below where the two conflict.** A direct filesystem audit of the actual
+> build server confirmed ZodiCore is **not** built by cloning the
+> qfsfountains-sourced base codebase described in
+> [base-codebase-strategy.md](../../architecture/base-codebase-strategy.md).
+> Its real codebase, at `/home/script/public_html/zodicore/` on the build
+> VPS, is a different commercial Laravel product: **Ultimate POS**, and it
+> already has 22 commercial addon modules installed and active — this is a
+> far more feature-complete starting point than "task tracker + generic
+> records on a genericized banking base," and the rest of this document
+> (written before this audit, describing a light back-office product) is
+> understated relative to what actually exists. A follow-up session MUST
+> reconcile §1 (Vision) through §10 (Non-Functional Requirements) against
+> the real capability confirmed here — this correction covers Architecture,
+> Technology, and Modules only.
 
-ZodiCore is built the same way every other product is: clone the sanitized
-base codebase and run the
-[genericization checklist](../../architecture/product-genericization-checklist.md).
-Because ZodiCore's own domain modules (task tracker, generic records) are
-intentionally light, this genericization pass is the largest part of
-ZodiCore's build — strip the banking-specific tables (`loans`, `dps`,
-`fdr`, `branches`/`branch_staff`, `other_banks`, `beneficiaries`,
-`airtime_operators`), rename hardcoded identity strings, and confirm the
-inherited engine (wallet/ledger, payment gateways, RBAC/auth, KYC, i18n,
-admin configuration, CMS) is presented as ZodiCore's own product surface —
-see
-[base-codebase-strategy.md](../../architecture/base-codebase-strategy.md).
-ZodiCore keeps the `web` and `admin` guards from the base and does not
-re-add the `branch_staff`-equivalent guard by default, since a plain
-back-office deployment has no property/depot/branch-scoped staff concept
-built in; a buyer needing multi-company scoping uses the `company_id`
-scoping layer per
-[localization-i18n.md](../../standards/localization-i18n.md#multi-company--multi-branch-data-scoping)
-the same way any other product does. There is no `tenant_id` anywhere in
-ZodiCore's schema.
+ZodiCore is still a standalone, self-hosted Laravel application, sold as
+source code to one buyer and deployed entirely within that buyer's own
+hosting account, with no shared platform service and no other Zodize
+product depending on it at runtime
+([single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md)) —
+that part of the architecture correction stands. What's corrected is *what
+codebase it's built from*:
 
-Where ZodiCore ships the optional plugin/marketplace system (per
+- **Base product**: Ultimate POS (identified via its distinctive module set
+  and the `nwidart/laravel-modules` package, confirmed in
+  `composer.lock`), not qfsfountains. Every other product's
+  clone-the-sanitized-base pipeline
+  ([product-genericization-checklist.md](../../architecture/product-genericization-checklist.md))
+  does not apply to ZodiCore, the same kind of deliberate exception
+  documented for [ZodiBank](../ZodiBank/SPEC.md#11-architecture) (Pay
+  Secure) and [ZodiCapital](../ZodiCapital/SPEC.md#11-architecture)/
+  [ZodiYield](../ZodiYield/SPEC.md#11-architecture) (novavest).
+- **22 addon modules are confirmed ALREADY INSTALLED AND ACTIVE, not
+  merely staged as .zip files awaiting installation.** The original
+  purchased addon packages (as downloaded zips) sit under
+  `modulesfiles/Ultimate POS Addons/` (20 versioned package directories:
+  Accounting, Advance Accounting, AI Assistance, Asset Management, CMS,
+  CRM with/without SaaS, Digital Product Catalogue, Essentials & HRM, Gym,
+  HMS, Inventory Management, Manufacturing, Partners, Project Management,
+  Repair, SpreadSheet, Superadmin, UltimatePOS-to-WooCommerce, and an
+  API/Connector module) — but `modules_statuses.json` at the codebase root
+  lists 22 modules (`Essentials`, `Accounting`, `AssetManagement`, `Cms`,
+  `Connector`, `Crm`, `Ecommerce`, `FieldForce`, `Manufacturing`,
+  `ProductCatalogue`, `Project`, `Repair`, `Spreadsheet`, `Superadmin`,
+  `Woocommerce`, `AiAssistance`, `Hms`, `InboxReport`, `CustomDashboard`,
+  `Gym`, `ZatcaIntegrationKsa`, `Cheque`) all set `true`, AND Laravel's own
+  `bootstrap/cache/*_module.php` service-provider cache files exist for
+  every one of them — this is definitive evidence the modules are
+  installed, their service providers are registered, and the application
+  has run with them active, not that they're sitting unopened as zips. The
+  "install all 22 addons" task is therefore **already done** for the
+  bulk-installation step; what remains is auditing the *combined result*
+  for conflicts, gaps against a full ERP requirement set, and the specific
+  known issues below — not a from-zero installation project.
+- **Known bugs, confirmed as open work (not yet verified fixed in this
+  audit pass)**:
+  1. The cheque payment type has no due-date field.
+  2. Extra top spacing renders incorrectly in several non-English
+     languages.
+  3. An error occurs when creating a customer or supplier record.
+- **Public front pages return 404; auth and the back office otherwise
+  function.** The static marketing/front pages need to be replaced with
+  the shared Zodize design-system frontend per
+  [frontend-standard.md](../../standards/frontend-standard.md) and
+  [frontend-backend-bridge.md](../../architecture/frontend-backend-bridge.md) —
+  this is purely a public-page replacement; authenticated admin/POS routes
+  are untouched.
+- **Open, non-blocking security item**: a licensing/provenance concern was
+  raised regarding whether the installed copy's documentation redirects to
+  a known script-piracy marker site. This audit could **not independently
+  confirm that specific claim** in this pass (a text search for the
+  reported marker string returned no matches in the areas searched, which
+  is not the same as confirming the claim is false — the search may not
+  have covered every relevant file, such as binary-adjacent vendor assets
+  or the `public/docs/images` directory, which was not inspected). This
+  MUST be tracked and verified directly — license authenticity confirmed,
+  and the codebase scanned for injected/backdoor code — before ZodiCore is
+  treated as a clean base for a sellable product, per
+  [`BUILD_STATE.md`](../../../BUILD_STATE.md)'s flagged items. This is
+  recorded as a **parallel, non-blocking task**: it does not block addon
+  conflict-resolution or feature-gap work, but it MUST be resolved before
+  GA.
+
+There is no `tenant_id` anywhere in ZodiCore's schema, matching every other
+product. Where ZodiCore ships the optional plugin/marketplace system (per
 [plugin-architecture.md](../../architecture/plugin-architecture.md)), that
 system extends *this one deployment only* — a plugin installed into one
 buyer's ZodiCore instance has no visibility into, or effect on, any other
-buyer's separately purchased and deployed ZodiCore instance. There is no
-Zodize-hosted cross-deployment plugin registry that phones home at runtime;
-the marketplace is a catalog a buyer's admin panel fetches listings from at
-install time, per
-[marketplace-architecture.md](../../architecture/marketplace-architecture.md).
+buyer's separately purchased and deployed ZodiCore instance.
 
 ## 12. Technology
 
-Laravel (PHP) + Vue per
+Laravel (PHP) + `nwidart/laravel-modules`, matching the confirmed Ultimate
+POS base rather than the qfsfountains base's flat namespace — see
 [coding-standards-php-laravel.md](../../development/coding-standards-php-laravel.md)
-and [coding-standards-vue.md](../../development/coding-standards-vue.md);
-MySQL/MariaDB + optional Redis cache per
-[database-standards.md](../../development/database-standards.md), matching
-the base codebase's inherited stack rather than introducing a different
-database engine than every other product.
+for the general Laravel standard, applied here within the module-per-domain
+structure Ultimate POS already uses. MySQL/MariaDB + optional Redis cache
+per
+[database-standards.md](../../development/database-standards.md).
 
 ## 13. Modules & Submodules
 
-| Module | Submodules |
-|---|---|
-| General Settings & Branding | Site Identity, Currency/Timezone, Social Login (inherited) |
-| Wallet & Ledger | Balances, Transactions, Deposits, Withdrawals, Balance Transfers (inherited) |
-| Payment Gateways | Gateway Configuration, Currency Conversion (inherited) |
-| Referral Program | Multi-level Commissions, Trigger Configuration (inherited) |
-| Plans | Plan CRUD, Features/Limits (inherited, genericized) |
-| KYC | Form Builder, Submission Review (inherited) |
-| Language / i18n | Language Management, Translation Editing (inherited) |
-| Roles & Permissions | Role Builder, Permission Assignment (inherited) |
-| CMS / Page Builder | Sections, SEO, Policy Pages, Sitemap (inherited) |
-| Task Tracker | Projects, Tasks, Boards, Comments, Attachments |
-| Generic Records | Record Type Builder, Dynamic Fields, List/Detail Views, Search |
-| Plugins & Marketplace (optional) | Plugin Runtime, Manifest/Permission Scoping, Marketplace Listing |
-| Reporting | Wallet/Transaction Dashboards, Task Completion, Report Builder |
+> **Verified correction**: the module list below reflects Ultimate POS's
+> confirmed-active 22 modules, not the "task tracker + generic records on a
+> genericized base" list this section previously described. That framing
+> is retired for ZodiCore.
+
+| Module | Status | Notes |
+|---|---|---|
+| Essentials & HRM | Active (confirmed) | Core HR: attendance, leave, payroll |
+| Accounting | Active (confirmed) | Chart of accounts, ledgers, journal entries |
+| Advance Accounting | Staged in `modulesfiles/`, verify active | Extended accounting workflows |
+| Asset Management | Active (confirmed) | Fixed asset registry, depreciation |
+| CMS | Active (confirmed) | Page builder for public site — see frontend replacement item above |
+| Connector / API | Active (confirmed) | Third-party API connector framework |
+| CRM (with/without SaaS variants) | Active (confirmed) | Lead/contact/deal pipeline |
+| Digital Product Catalogue & Menu | Staged in `modulesfiles/`, verify active vs. `ProductCatalogue` | Public-facing product/menu catalogue |
+| Ecommerce | Active (confirmed) | Storefront module |
+| Field Force | Active (confirmed) | Field sales/service team tracking |
+| Manufacturing | Active (confirmed) | BOM, production orders, recipe/ingredient tracking |
+| Gym | Active (confirmed) | Membership management, member scanner |
+| HMS | Active (confirmed) | Hospital/clinic management |
+| Inventory Management | Staged in `modulesfiles/`, verify vs. core POS inventory | Extended inventory workflows |
+| Partners | Staged in `modulesfiles/`, verify active | Partner/reseller management |
+| Project Management | Active (confirmed) | Projects, tasks, to-dos |
+| Repair | Active (confirmed) | Repair ticket/status tracking |
+| SpreadSheet | Active (confirmed) | In-app spreadsheet tool |
+| Superadmin | Active (confirmed) | Multi-business/package/pricing admin layer |
+| UltimatePOS-to-WooCommerce | Active (confirmed as `Woocommerce`) | WooCommerce sync |
+| AI Assistance | Active (confirmed) | AI-assisted features |
+| Inbox Report | Active (confirmed) | Scheduled report delivery |
+| Custom Dashboard | Active (confirmed) | Dashboard widget customization |
+| ZATCA Integration (KSA) | Active (confirmed) | Saudi e-invoicing compliance |
+| Cheque | Active (confirmed), missing due-date field | See known bug #1 above |
+
+Every row marked "verify active" needs a direct confirmation pass (check
+`modules_statuses.json` and `bootstrap/cache/` for that module's service
+provider) rather than assuming the `modulesfiles/` staging directory's
+presence means it's live — some staged packages may not map 1:1 to the
+`modules_statuses.json` entries by name and need explicit reconciliation.
+Cross-cutting ERP requirement areas to audit for gaps **after** the 22
+modules above are confirmed and conflicts resolved: procurement/purchasing
+workflows distinct from what Accounting/Inventory already cover, business
+intelligence/reporting beyond Inbox Report and Custom Dashboard, and
+multi-company/branch scoping depth (Superadmin covers some of this, but
+confirm it matches
+[localization-i18n.md](../../standards/localization-i18n.md#multi-company--multi-branch-data-scoping)'s
+requirement).
 
 ## 14. Database Design
 

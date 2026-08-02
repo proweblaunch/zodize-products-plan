@@ -18,11 +18,20 @@ Zodize has two audited codebases, and today they do not talk to each other:
    the real, implemented design system every product's public pages must
    use — Tailwind v4 tokens matching
    [`../design-system/`](../design-system/), and a library of reusable Blade
-   components at `resources/views/components/zodize/` (`button`, `badge`,
-   `card`, `input`, `textarea`, `container`, `section`, `nav.header`,
-   `nav.footer`, `hero`, `feature-grid`, `testimonial`, `pricing-table`,
-   `faq`, `cta-band`, `stat-block`, `logo-cloud`, `breadcrumbs`,
-   `empty-state`, `404`, namespaced `x-zodize.*`). **This frontend is
+   components at `resources/views/components/zodize/`, namespaced
+   `x-zodize.*`. **Verified correction**: a direct filesystem audit of this
+   directory confirms only **eight** components currently exist —
+   `button`, `badge`, `card`, `input`, `textarea`, `container`, `section`,
+   and `nav.header` (26KB, substantial). An earlier draft of this document
+   additionally listed `nav.footer`, `hero`, `feature-grid`, `testimonial`,
+   `pricing-table`, `faq`, `cta-band`, `stat-block`, `logo-cloud`,
+   `breadcrumbs`, `empty-state`, and `404` as existing — **none of those
+   twelve were found on disk** in this audit pass. Treat them as **not yet
+   built** rather than existing-but-unaudited: any product's marketing site
+   that needs a hero section, pricing table, testimonial block, FAQ
+   accordion, or footer nav will need that component built first, following
+   the confirmed eight components' conventions, before it can be used in
+   the section-type-to-component mapping below. **This frontend is
    currently 100% static Blade with hardcoded content.** It does not read
    from the base's `frontends`/`pages` tables at all.
 

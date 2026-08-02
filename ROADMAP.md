@@ -90,11 +90,21 @@ layer on the product's own domain modules. Getting this pipeline right once,
 on the simplest product, is far cheaper than discovering a pipeline defect
 on the fourth or fifth product.
 
-> **ZodiTrack is excluded from this build-from-scratch queue.** It already
-> exists as a complete, working, currently-resold product — see
-> `PRODUCT_CATALOG.md`'s `Live — Extend Only` status and `BUILD_STATE.md`
-> for its audit-driven gap-fill queue. Nothing below applies to it: it is
-> never cloned, re-scaffolded, or built fresh.
+> **Four products are excluded from this build-from-scratch queue** because
+> each is built by auditing and extending an already-substantial existing
+> codebase rather than cloning the sanitized qfsfountains base — see each
+> product's own `SPEC.md` §11 and `BUILD_STATE.md` for specifics:
+> - **ZodiTrack** — already a complete, working, currently-resold product
+>   (`PRODUCT_CATALOG.md`'s `Live — Extend Only` status).
+> - **ZodiBank** — built on "Pay Secure," a separate commercial banking
+>   codebase, already substantially feature-complete.
+> - **ZodiCore** — built on "Ultimate POS," a separate commercial
+>   Laravel/POS/ERP codebase with 22 addon modules already active.
+> - **ZodiCapital** and **ZodiYield** — both built on and improved from
+>   "novavest," a separate existing Laravel investment-platform codebase.
+>
+> None of these four are cloned, re-scaffolded, or built fresh from the
+> sanitized base; nothing in the numbered queue below applies to them.
 
 1. **ZodiBusiness** — general SMB ERP (CRM, inventory, invoicing). Closest
    fit to the base codebase's existing shape (users, wallet, plans), so it
@@ -110,29 +120,34 @@ on the fourth or fifth product.
 5. **ZodiEstate** — real estate management.
 6. **ZodiHotel** — hospitality/PMS.
 7. **ZodiReach** — marketing/outreach/CRM-adjacent.
-8. **ZodiCore** — general-purpose ERP/back-office starter product (no longer
-   a shared platform — just the product whose domain surface is closest to
-   the base codebase as-is).
-9. **ZodiMed** — healthcare/clinic management (highest compliance bar —
-    HIPAA-equivalent).
-10. **ZodiCampus** — education/campus management.
-11. **ZodiLaw** — legal practice management.
-12. **ZodiBuild** — construction/project management.
-13. **ZodiAgro** — agriculture management.
-14. **ZodiGov** — government/public sector.
-15. **ZodiBank** — core banking (highest security bar; re-adds the
-    loan/DPS/FDR domain modules the genericization checklist strips from
-    every other product).
-16. **ZodiTrade** — brokerage/trading.
-17. **ZodiXchange** — exchange infrastructure.
-18. **ZodiCapital** — investment/fund management.
-19. **ZodiYield** — yield/lending products.
+8. **ZodiMed** — healthcare/clinic management (highest compliance bar —
+   HIPAA-equivalent).
+9. **ZodiCampus** — education/campus management.
+10. **ZodiLaw** — legal practice management.
+11. **ZodiBuild** — construction/project management.
+12. **ZodiAgro** — agriculture management.
+13. **ZodiGov** — government/public sector.
+14. **ZodiTrade** — brokerage/trading. Fresh Laravel build on the sanitized
+    base; dash/Bicrypto and web3chainlink are feature/UX references only,
+    never ported (dash is a Node/pnpm/PM2 monorepo, confirmed not portable
+    to this architecture).
+15. **ZodiXchange** — exchange infrastructure. Same fresh-build treatment
+    as ZodiTrade.
+16. **ZodiChain** — multi-chain wallets, NFT marketplace, crypto swaps, and
+    crypto-denominated affiliate/MLM (new product, promoted from
+    future-expansion — see `PRODUCT_CATALOG.md`). Same fresh-build
+    treatment; web3chainlink is a partially-confirmed Laravel-based
+    reference (its `Modules/` contents need a deeper audit before relying
+    on it further).
 
-Financial products (15–19) are sequenced last because they carry the deepest
-security, audit, and compliance requirements, and because several of them
-(ZodiXchange, ZodiTrade, ZodiBank) require the multi-currency wallet
-extension documented in `docs/decisions/0002-single-currency-wallet-by-default.md` —
-best tackled once the base pipeline is well-proven on simpler products.
+Financial products (14–16) are sequenced last among the from-scratch queue
+because they carry the deepest security, audit, and compliance
+requirements, and because all three require the dual trading/swap-
+execution-mode architecture (external API or internal engine,
+admin-selectable) and, for ZodiXchange/ZodiTrade specifically, the
+multi-currency wallet extension documented in
+`docs/decisions/0002-single-currency-wallet-by-default.md` — best tackled
+once the base pipeline is well-proven on simpler products.
 
 ## Non-goals for this phase
 

@@ -13,12 +13,13 @@ another being deployed or reachable).
 | [ZodiBank](./docs/products/ZodiBank/SPEC.md) | Core banking platform for digital-first banks and credit unions | Banking | Foundation |
 | [ZodiTrade](./docs/products/ZodiTrade/SPEC.md) | Multi-asset brokerage and trading platform | Capital Markets | Foundation |
 | [ZodiXchange](./docs/products/ZodiXchange/SPEC.md) | Exchange infrastructure for spot and derivatives markets | Capital Markets | Foundation |
+| [ZodiChain](./docs/products/ZodiChain/SPEC.md) | Multi-chain custodial/non-custodial wallet, NFT marketplace, and crypto swap platform | Cryptocurrency / Digital Assets | Foundation |
 | [ZodiEstate](./docs/products/ZodiEstate/SPEC.md) | Property management and real estate operations platform | Real Estate | Foundation |
 | [ZodiMed](./docs/products/ZodiMed/SPEC.md) | Clinic and hospital management with patient records | Healthcare | Foundation |
 | [ZodiCampus](./docs/products/ZodiCampus/SPEC.md) | Campus and student information system | Education | Foundation |
 | [ZodiCommerce](./docs/products/ZodiCommerce/SPEC.md) | Enterprise storefront and order management | Retail / E-commerce | Foundation |
 | [ZodiBusiness](./docs/products/ZodiBusiness/SPEC.md) | SMB ERP: CRM, inventory, invoicing, accounting | SMB / General | Foundation |
-| [ZodiTrack](./docs/products/ZodiTrack/SPEC.md) | Asset and inventory tracking across locations | Logistics | Live — Extend Only |
+| [ZodiTrack](./docs/products/ZodiTrack/SPEC.md) | Freight/shipment tracking and logistics brokerage (pitch corrected from "asset/inventory tracking" — see the product's SPEC.md §0 for the verified domain correction) | Logistics | Live — Extend Only |
 | [ZodiCapital](./docs/products/ZodiCapital/SPEC.md) | Fund and investment portfolio management | Asset Management | Foundation |
 | [ZodiYield](./docs/products/ZodiYield/SPEC.md) | Lending, credit, and yield product management | Fintech Lending | Foundation |
 | [ZodiReach](./docs/products/ZodiReach/SPEC.md) | Marketing automation and omnichannel outreach | Marketing | Foundation |
@@ -68,8 +69,17 @@ domain modules per
 [`docs/architecture/product-genericization-checklist.md`](./docs/architecture/product-genericization-checklist.md).
 No product depends on another product, or on any Zodize-operated central
 service, being deployed or reachable at runtime. `ZodiCore` is not a shared
-platform the other nineteen depend on — it is its own sellable product (a
+platform the other twenty depend on — it is its own sellable product (a
 general-purpose ERP/back-office starter), listed here on equal footing with
 every other product. `ZodiTrack` is the one exception to the
 clone-from-base build pipeline described above — it is already live and
-independently built; see its `Live — Extend Only` status.
+independently built; see its `Live — Extend Only` status. This brings the
+catalog to **21 products**. `ZodiChain` is the newest addition, promoted
+from a previously-unlisted future-expansion idea to an active product on
+direct confirmation that a real reference codebase (`web3chainlink`, a
+Laravel-based crypto-adjacent commercial script on the build server) and a
+UX reference (`dash`/Bicrypto, a Node.js crypto trading platform studied for
+feature/UX equivalence only, never ported) both exist — see
+[`docs/products/ZodiChain/SPEC.md`](./docs/products/ZodiChain/SPEC.md#111-reference-codebases-featureux-study-only-never-ported)
+and its `## Open Questions` section for what remains to be verified about
+`web3chainlink`'s exact functional scope.

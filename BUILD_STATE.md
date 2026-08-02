@@ -1,7 +1,9 @@
 # Build State Ledger
 
 > The single source of truth for exactly where autonomous/human build
-> execution stands, across all 20 Zodize products. This file is the
+> execution stands, across all 21 Zodize products (20 original + ZodiChain,
+> promoted from future-expansion — see
+> [`PRODUCT_CATALOG.md`](./PRODUCT_CATALOG.md)). This file is the
 > resumability mechanism for
 > [`docs/architecture/deployment-paths.md`](./docs/architecture/deployment-paths.md)'s
 > build convention — read it before touching any code.
@@ -41,40 +43,60 @@
    in that product's row below, and add only additive features via normal,
    rollback-safe migrations — never modifying or removing anything already
    functioning.
+7. **Alternate-base products are not genericized from qfsfountains.**
+   ZodiBank (Pay Secure), ZodiCore (Ultimate POS), and ZodiCapital/ZodiYield
+   (novavest) are each built from a different, already-substantial existing
+   codebase — see each product's own `SPEC.md` §11 for the specifics. The
+   standard clone-qfsfountains-and-genericize pipeline in
+   [`docs/architecture/product-genericization-checklist.md`](./docs/architecture/product-genericization-checklist.md)
+   does not apply to these four; treat them as "audit the existing base,
+   extend/fix additively" work, closer in spirit to rule 6 above than to a
+   from-scratch build, even though they are not sold to real buyers yet
+   (so not `Live — Extend Only` in PRODUCT_CATALOG.md's strict sense).
 
-## Environment note (read before assuming any row below is stale)
+## Environment access
 
-This ledger was initialized in a documentation-only Claude Code session
-whose filesystem does **not** include `/home/script/public_html/` — that
-path was checked directly and does not exist in this session's container.
-Because of that, **no product's on-disk state could be verified or acted
-on when this ledger was created**, including ZodiTrack's claimed live
-codebase. Every `status` below reflects only what could be established from
-this repository's specs, not a real filesystem audit. Per protocol rule 5,
-this is recorded as a flagged item, not guessed past. The next session that
-*does* have access to `/home/script/public_html/` MUST perform the
-verification step in protocol rule 2 for every product before trusting or
-advancing any row below — starting with ZodiTrack, whose audit is the most
-time-sensitive since it's already live and being sold.
+**Resolved.** An earlier version of this ledger recorded that
+`/home/script/public_html/` and the source codebases were unreachable —
+that blocker is resolved as of the session that added this paragraph. The
+**Zodize MCP Server** (filesystem/git/GitHub/terminal/database/deployment
+tools) provides real access to the build VPS, with a workspace root of
+`/home/` — confirmed by direct listing, which surfaced `script/`,
+`qfsfountains/`, `zodize/`, `novavest/`, `dash/`, `web3chainlink/`, and
+several other product/client directories not part of Zodize's 20(+1)
+product catalog (e.g. `altaramarkets`, `clintrade`, `davidomakamba`,
+`elitratrustbank`, `jaguarmarkets`, `refinedresidence`, `rochygreen`,
+`shieldsafebank`, `trustsharelogistics`, `veluxtech`, and others under
+`script/public_html/` itself: `altaramarkets`, `demo1`/`demo2`/`demo3`,
+`g3ph`, `zodira`). **Do not touch anything outside the 20(+1) product
+slugs** — those other directories belong to unrelated work and are out of
+scope for this repository's build execution, per the task instruction that
+established this rule.
 
 ## Status definitions
 
 - `not-started` — no code exists at this product's path yet.
-- `in-progress` — base clone/genericization or domain modules are actively
-  underway; not yet feature-complete against its `SPEC.md`.
+- `in-progress` — base clone/genericization, alternate-base audit/extend,
+  or domain modules are actively underway; not yet feature-complete
+  against its `SPEC.md`.
 - `feature-complete` — every Functional Requirement in the product's
   `SPEC.md` is implemented; GA-gate hardening (deep artifacts, load
   testing, etc.) may still be outstanding.
-- `extending-existing` — the `Live — Extend Only` workflow: auditing and
-  additively extending a codebase that already exists independent of this
-  pipeline.
+- `extending-existing` — the `Live — Extend Only` workflow (ZodiTrack) or
+  the alternate-base audit/extend workflow (ZodiBank, ZodiCore,
+  ZodiCapital, ZodiYield) — auditing and additively extending a codebase
+  that already exists, rather than a from-scratch clone/genericize build.
 - `blocked` — cannot safely proceed; see the Flagged Items section for why.
 
 ## Product ledger
 
 | Product | Status | Current step | Last updated | Next |
 |---|---|---|---|---|
-| ZodiTrack | `blocked` | On-disk audit against `docs/products/ZodiTrack/SPEC.md` could not be performed — see Flagged Items | 2026-07-31 | A session with real access to `/home/script/public_html/zoditrack/` must run the audit and populate this row's gap list before any extend work starts |
+| ZodiTrack | `extending-existing` | Confirmed on disk at `script/public_html/zoditrack/`: native procedural PHP (mysqli, page-routed `.php` files) freight/shipment-tracking site with public tracking-number lookup, customer portal, and a 33-file admin back office (shipments, branches, staff, customers, vendors, invoices, reports). **Domain mismatch found**: `docs/products/ZodiTrack/SPEC.md` was written describing an ITAM/enterprise-asset-tracking tool, which does not match — see the correction notice added to that spec's §0 | 2026-07-31 | Read every file under `admin/` in full, rewrite SPEC.md §1–§7 to describe the real freight-tracking business, then populate a real gap list |
+| ZodiBank | `extending-existing` | Confirmed on disk at `script/public_html/zodibank/`: Laravel + `nwidart/laravel-modules`, built on "Pay Secure," with `Modules/Agent` and `Modules/Merchant` already present, and Authorize.Net/Flutterwave/CoinGate/CinetPay gateways already in `composer.json`. Confirmed absent (via code search): FDR, DPS, account-number generation, staff/branch management. FINCRA_INTEGRATION.md spec added, several Fincra API specifics flagged as needing live-docs verification (WebFetch to docs.fincra.com returned HTTP 403 in this session) | 2026-07-31 | Build FDR/DPS/account-number/staff/branch modules fresh; verify Fincra's exact auth/webhook header names against live docs before implementing the integration; audit Pay Secure's own wallet/ledger against `docs/standards/wallet-system.md`'s invariants before building on it |
+| ZodiCore | `extending-existing` | Confirmed on disk at `script/public_html/zodicore/`: Laravel + `nwidart/laravel-modules`, built on "Ultimate POS," with 22 addon modules **already installed and active** (confirmed via `modules_statuses.json` all-`true` plus `bootstrap/cache/*_module.php` service-provider caches for every one) — NOT merely staged as zips awaiting install, correcting the original task premise. 3 known bugs open (cheque due-date field, language-specific spacing bug, customer/supplier creation error) — not yet verified fixed. Public front pages confirmed 404; auth/admin routes function | 2026-07-31 | Reconcile SPEC.md §1–§10 against the real Ultimate POS capability (far more than "task tracker + generic records"); resolve addon conflicts; audit for ERP gaps (procurement, BI) beyond the 22 modules; fix the 3 bugs; replace front pages per `docs/standards/frontend-standard.md`; run the parallel license/backdoor security check (see Flagged Items) |
+| ZodiCapital | `extending-existing` | Confirmed on disk at `novavest/public_html/core/`: Laravel app, same `assets/`+`core/` structural split as the qfsfountains-lineage convention. Exact existing feature set (app/ contents, migrations) NOT yet audited — only the directory shape and Laravel identity are confirmed | 2026-07-31 | Audit `novavest/core/app/` and `novavest/core/database/migrations/` against `docs/products/ZodiCapital/SPEC.md` to produce a concrete gap list before building new modules — coordinate with ZodiYield's session, same codebase |
+| ZodiYield | `extending-existing` | Same novavest/core base as ZodiCapital (see above); same audit-not-yet-done caveat | 2026-07-31 | Same novavest audit as ZodiCapital — do not duplicate; check whether ZodiCapital's session already ran it first |
 | ZodiBusiness | `not-started` | Not begun — first in build order (`ROADMAP.md` #1), reference pipeline product | 2026-07-31 | Clone sanitized base to `/home/script/public_html/zodibusiness/`, run `product-genericization-checklist.md` |
 | ZodiCommerce | `not-started` | Not begun (`ROADMAP.md` #2) | 2026-07-31 | Blocked behind ZodiBusiness validating the pipeline first |
 | ZodiPOS | `not-started` | Not begun (`ROADMAP.md` #3) | 2026-07-31 | Queued |
@@ -82,62 +104,70 @@ time-sensitive since it's already live and being sold.
 | ZodiEstate | `not-started` | Not begun (`ROADMAP.md` #5) | 2026-07-31 | Queued |
 | ZodiHotel | `not-started` | Not begun (`ROADMAP.md` #6) | 2026-07-31 | Queued |
 | ZodiReach | `not-started` | Not begun (`ROADMAP.md` #7) | 2026-07-31 | Queued |
-| ZodiCore | `not-started` | Not begun (`ROADMAP.md` #8) | 2026-07-31 | Queued |
-| ZodiMed | `not-started` | Not begun (`ROADMAP.md` #9) | 2026-07-31 | Queued |
-| ZodiCampus | `not-started` | Not begun (`ROADMAP.md` #10) | 2026-07-31 | Queued |
-| ZodiLaw | `not-started` | Not begun (`ROADMAP.md` #11) | 2026-07-31 | Queued |
-| ZodiBuild | `not-started` | Not begun (`ROADMAP.md` #12) | 2026-07-31 | Queued |
-| ZodiAgro | `not-started` | Not begun (`ROADMAP.md` #13) | 2026-07-31 | Queued |
-| ZodiGov | `not-started` | Not begun (`ROADMAP.md` #14) | 2026-07-31 | Queued |
-| ZodiBank | `not-started` | Not begun (`ROADMAP.md` #15) | 2026-07-31 | Queued |
-| ZodiTrade | `not-started` | Not begun (`ROADMAP.md` #16) | 2026-07-31 | Queued |
-| ZodiXchange | `not-started` | Not begun (`ROADMAP.md` #17) | 2026-07-31 | Queued |
-| ZodiCapital | `not-started` | Not begun (`ROADMAP.md` #18) | 2026-07-31 | Queued |
-| ZodiYield | `not-started` | Not begun (`ROADMAP.md` #19) | 2026-07-31 | Queued |
+| ZodiMed | `not-started` | Not begun (`ROADMAP.md` #9, renumbered — ZodiCore is now `extending-existing`, not a from-scratch build slot) | 2026-07-31 | Queued |
+| ZodiCampus | `not-started` | Not begun | 2026-07-31 | Queued |
+| ZodiLaw | `not-started` | Not begun | 2026-07-31 | Queued |
+| ZodiBuild | `not-started` | Not begun | 2026-07-31 | Queued |
+| ZodiAgro | `not-started` | Not begun | 2026-07-31 | Queued |
+| ZodiGov | `not-started` | Not begun | 2026-07-31 | Queued |
+| ZodiTrade | `not-started` | Not begun. Fresh Laravel build on sanitized qfsfountains base — dash/Bicrypto and web3chainlink are feature/UX references only, never ported (dash is a Node/pnpm/PM2 monorepo, confirmed not portable) | 2026-07-31 | Queued; dual trading-mode architecture (external API / internal engine) documented in SPEC.md §11.2 |
+| ZodiXchange | `not-started` | Same as ZodiTrade — fresh Laravel build, dash/web3chainlink as references only | 2026-07-31 | Queued |
+| ZodiChain | `not-started` | New product, promoted from future-expansion this session. Fresh Laravel build on sanitized qfsfountains base. `web3chainlink/public_html/project/` confirmed to be an ordinary Laravel app (not Bicrypto's Node monorepo) with crypto-adjacent composer deps (`flutterwavedev/flutterwave-v3`, `anandsiddharth/laravel-paytm-wallet`, `bacon/bacon-qr-code`) — its `Modules/` contents and README were NOT yet inspected, so its exact feature scope as a reference is unconfirmed | 2026-07-31 | Inspect `web3chainlink/public_html/project/Modules/` and `README.md` before assuming it's a validated reference for any specific ZodiChain module; then queued behind the earlier build-order items |
 
 ## ZodiTrack gap list
 
-**Not yet populated.** This section exists to hold the feature-by-feature
-gap list (spec requirement → present/absent in the live codebase) once a
-session with real filesystem access to `/home/script/public_html/zoditrack/`
-completes the required audit against
-[`docs/products/ZodiTrack/SPEC.md`](./docs/products/ZodiTrack/SPEC.md).
-Until then, treat ZodiTrack as `blocked`, not as having no gaps — an
-unperformed audit is not the same thing as a clean audit.
+**Not yet populated in feature-by-feature form.** §0 of
+[`docs/products/ZodiTrack/SPEC.md`](./docs/products/ZodiTrack/SPEC.md) now
+records what's confirmed present (tracking-number lookup, shipment CRUD,
+branches, staff, customers, vendors, invoicing, reporting, notifications,
+activity log, settings) and what's still needed before a real gap list is
+meaningful (a full rewrite of the spec's Vision/Purpose/Personas sections,
+which currently describe the wrong business domain entirely).
 
 ## Flagged Items
 
-### 2026-07-31 — Build path and both base codebases unreachable in this session
+### 2026-07-31 — ZodiCore: unconfirmed license/piracy-marker claim (parallel, non-blocking)
 
-**Severity: blocks all of Part 2 (autonomous build execution) and the
-ZodiTrack audit specifically.**
+The build instructions asked to record, as an open (non-blocking) security
+item, a claim that ZodiCore's installed copy's readme file redirects to
+`nullphpscript.com`, a script-piracy site marker. A text search for this
+string across ZodiCore's codebase in this session returned no matches —
+but the search may not have covered every relevant location (binary/vendor
+assets, `public/docs/images`, or a runtime redirect that isn't a static
+string in a text file). **This does not confirm the claim is false** — it
+means this pass could not confirm it either way. A follow-up session MUST:
 
-This session's container filesystem does not contain
-`/home/script/public_html/` (checked directly: does not exist), nor does it
-contain the two codebases this handbook's architecture docs are audited
-from (`/home/qfsfountains/public_html` and `/home/zodize/public_html` —
-both checked directly in an earlier session on this same repository and
-also do not exist here). This session has access only to this git
-repository (`zodize-products-plan`).
+1. Directly inspect the actual documentation viewer / license-check code
+   path (likely under `app/Http/Controllers/Install/` or a licensing
+   service class) for any outbound redirect logic, not just grep static
+   files.
+2. Verify license authenticity through Ultimate POS's legitimate purchase
+   channel if a purchase code/verification mechanism exists in the
+   codebase.
+3. Scan for injected/backdoor code generally (unexpected outbound HTTP
+   calls, obfuscated code, unfamiliar cron entries) as a broader precaution
+   before ZodiCore is treated as a clean base for a sellable product.
 
-Consequences recorded here rather than guessed past:
+This is explicitly a **parallel task, not a blocker** — addon
+conflict-resolution and feature-gap work on ZodiCore may proceed
+concurrently, but this item MUST be resolved before ZodiCore reaches its
+GA gate (per
+[`docs/checklists/production-readiness-checklist.md`](./docs/checklists/production-readiness-checklist.md)).
 
-- **ZodiTrack's on-disk audit could not be performed.** Its "already live"
-  claim could not be verified, and no gap list could be produced, because
-  there is nothing to inspect. Marking it `blocked` rather than fabricating
-  an audit result.
-- **No product build work could begin.** Part 2's build execution
-  (clone → genericize → bridge → extend, per product) requires the base
-  codebase and the target path, neither of which exist in this session.
-  Writing product code without them would mean inventing a "base codebase"
-  from scratch rather than genericizing the real, audited one this
-  handbook describes — which would silently violate
-  [`base-codebase-strategy.md`](./docs/architecture/base-codebase-strategy.md)'s
-  entire premise and produce something that doesn't match what a buyer
-  actually receives.
+### 2026-07-31 — ZodiTrack SPEC.md domain mismatch (see also the ledger row above)
 
-**What would resolve this**: a session (or an addition to this session's
-environment) with actual access to `/home/script/public_html/` and the two
-source codebases. Until that access exists, the next thing to do is
-**not** to start writing Laravel code that approximates the base engine
-from memory — it's to confirm where that access lives and connect to it.
+Recorded in full in `docs/products/ZodiTrack/SPEC.md` §0. Summarized here
+for visibility: the existing spec describes an ITAM/enterprise-asset
+-tracking tool; the real, live, currently-resold product is a freight/
+shipment-tracking and logistics-brokerage website. Do not use §1–§7 of that
+spec to guide any ZodiTrack extension work until they're rewritten.
+
+### 2026-07-31 (resolved) — Build path and base codebases were unreachable
+
+Previously recorded as a blocker: this repository's own git-backed session
+had no filesystem access to `/home/script/public_html/` or the source
+codebases. **Resolved** — the Zodize MCP Server, added in a later session,
+provides real access (workspace root `/home/`), used to perform every
+audit finding recorded in this ledger update. Left here for history rather
+than deleted, per the principle that this ledger's Flagged Items section is
+a record, not just a live TODO list.

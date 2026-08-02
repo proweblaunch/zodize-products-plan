@@ -61,6 +61,7 @@ Capital markets, wealth management, retail and institutional brokerage.
 | Portfolio/positions tooling | Addepar, Black Diamond | Positions and tax lots share one audit trail with orders and settlement, not a reconciled downstream copy |
 | Market data distribution | Refinitiv Eikon feeds, Polygon.io, IEX Cloud | Feed-agnostic ingestion contract so a buyer can swap vendors without touching the OMS |
 | Trade confirmation/compliance | Broadridge, SS&C Advent | Confirmations and audit trail generated directly from the settlement ledger of record |
+| Binary/fixed-payout trading UX | Bicrypto-class binary/AI-trading tools (feature/UX reference only, per §11.1) | Reimplemented as a fresh PHP/Laravel internal pricing engine (§11.2), not ported Node.js code, so the deployment still runs on ordinary shared/VPS hosting |
 
 ## 6. Personas
 
@@ -196,6 +197,71 @@ dependency on any other Zodize product or on a Zodize-operated central
 service; the only external dependencies are the third-party clearing
 broker, market data, and KYC integrations the buyer's own brokerage
 configures (§22).
+
+### 11.1 Reference codebases: feature/UX study only, never ported
+
+A direct filesystem audit of the build server identified two existing
+crypto/trading codebases the engineering team may be tempted to reuse:
+`dash` (confirmed via its own `package.json` to be "Bicrypto" v6.3.0,
+at `/home/dash/public_html`) and `web3chainlink` (at
+`/home/web3chainlink/public_html/project/`). **Neither is a base ZodiTrade
+clones, forks, or ports code from.** `dash`/Bicrypto is a Node.js/TypeScript
+pnpm monorepo (separate `frontend/`/`backend/` directories, PM2 process
+management via `ecosystem.config.js`) — a fundamentally different runtime
+from the PHP/Laravel, shared/VPS-hosting-deployable architecture every
+Zodize product commits to (see
+[base-codebase-strategy.md](../../architecture/base-codebase-strategy.md)
+and [overview.md](../../architecture/overview.md)). Its Node process-manager
+deployment model is incompatible with a buyer running the product on
+ordinary shared/VPS hosting with zero DevOps involvement, so its code is
+never ported. `web3chainlink`, by contrast, is confirmed to be an ordinary
+Laravel application (has `app/`, `artisan`, `composer.json`, a
+`Modules/`-pattern directory) and is a closer structural relative of
+ZodiTrade's own target architecture — but its exact functional coverage
+relative to ZodiTrade's brokerage/OMS scope has not been fully audited; see
+[Open Questions](#open-questions) below.
+
+Both codebases are used exclusively as **feature and UX references**:
+ZodiTrade's Order Management, Routing, Portfolio, Margin, and Settlement
+modules are fresh PHP/Laravel implementations, built against this spec's
+own data model (§14) and endpoint catalog (§15), that aim for equivalent
+buyer-facing capability to what these reference codebases demonstrate —
+never a line-for-line or structural port of either one's source.
+
+### 11.2 Dual trading-execution mode: external API vs. internal engine
+
+ZodiTrade's order routing supports two execution modes, selected per
+deployment (and, where the admin configures it, per instrument or asset
+class) from the admin panel — never hard-coded to one or the other:
+
+- **External API mode**: the buyer's admin panel accepts credentials for a
+  third-party clearing broker or execution venue (§22), and the
+  `BrokerRoutingContract` routes orders through that external API. This is
+  the mode a broker-dealer with an existing clearing relationship uses.
+- **Internal/native trading engine mode**: no third-party broker/venue API
+  is required. ZodiTrade implements its own order execution logic
+  internally — for binary-style or fixed-payout instrument types, an
+  admin-configured payout-odds/pricing model determines settlement price
+  and payout without any external counterparty; for standard equity/ETF
+  instrument types in this mode, ZodiTrade fills orders against an
+  admin-configured reference price feed rather than routing to a venue.
+  This mode lets a buyer launch with zero third-party trading-execution
+  dependency and start taking orders immediately after install.
+
+Both modes implement the same `BrokerRoutingContract` interface (already
+established as the routing abstraction earlier in this section), following
+the same pluggable-gateway pattern documented in
+[payment-gateways.md](../../standards/payment-gateways.md) for payment
+gateways: the OMS core (order state machine, portfolio, margin, settlement,
+audit log) is written once against the contract and is unaware which
+implementation is active. A buyer can switch from the internal engine to an
+external API (or vice versa) from the admin panel — per
+[admin-configuration-baseline.md](../../standards/admin-configuration-baseline.md)'s
+pattern of zero-code-change configuration — without any change to
+application code elsewhere. `ExternalBrokerExecutionProvider` and
+`InternalPricingEngineProvider` are the two concrete implementations
+shipped by default; a third-party or custom provider can be added following
+the same contract.
 
 ## 12. Technology
 
@@ -377,9 +443,12 @@ occur via a new offsetting record referencing the original.
 
 ## 22. Integrations
 
-- **Clearing/execution brokers**: order routing to a clearing broker or
-  execution venue (e.g. an Apex/Alpaca-class clearing relationship or
-  direct exchange connectivity) behind a `BrokerRoutingContract`.
+- **Clearing/execution brokers** (external API mode, §11.2): order routing
+  to a clearing broker or execution venue (e.g. an Apex/Alpaca-class
+  clearing relationship or direct exchange connectivity) behind a
+  `BrokerRoutingContract`. Where a deployment instead runs in internal
+  engine mode, no clearing-broker integration is required at all — see
+  §11.2.
 - **Market data vendors**: real-time quote feeds (e.g. Polygon.io, IEX
   Cloud, Refinitiv-class vendors) behind a `MarketDataFeedContract`,
   normalized to one internal quote schema.
@@ -516,6 +585,29 @@ obligations before go-live.
 - Smart order routing across multiple execution venues by price/liquidity.
 - Configurable margin methodology beyond Reg T (e.g. portfolio margining).
 
+## Open Questions
+
+- **`web3chainlink`'s actual functional scope is not yet fully audited.**
+  The build-server audit confirmed `web3chainlink` (at
+  `/home/web3chainlink/public_html/project/`) is an ordinary Laravel
+  application — `app/`, `artisan`, `composer.json` (generic
+  `laravel/laravel` package name, so it is a white-labeled commercial
+  script, not identifiable by package name alone), a `Modules/` directory
+  (`nwidart/laravel-modules` pattern, the same pattern as ZodiBank's Pay
+  Secure base), and a `licence.php` file at the root suggesting
+  license-gating logic common to CodeCanyon-style commercial scripts.
+  Confirmed payment/crypto-adjacent composer dependencies include
+  `flutterwavedev/flutterwave-v3`, `anandsiddharth/laravel-paytm-wallet`,
+  `bacon/bacon-qr-code`, and `barryvdh/laravel-dompdf`. Its `Modules/`
+  directory contents and README.md were **not** inspected during this audit
+  pass — a follow-up session MUST open `Modules/` and confirm exactly which
+  functional slice (brokerage/OMS-relevant vs. exchange/wallet-relevant vs.
+  something else entirely) it actually implements before this spec treats
+  it as a validated feature/UX reference for any specific ZodiTrade module
+  beyond the general observation that it demonstrates a real Laravel-based
+  payment/crypto-adjacent commercial script exists. Do not assume
+  equivalence to Bicrypto's feature set until that follow-up audit runs.
+
 ## Roadmap (spec depth)
 
 This spec's Architecture and Core Data Model sections were revised to
@@ -523,7 +615,18 @@ reflect the corrected standalone, self-hosted, single-tenant deployment
 model — see
 [single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md)
 and [base-codebase-strategy.md](../../architecture/base-codebase-strategy.md).
-This spec is Foundation-depth. Queued for Deep-depth expansion: a full ER
+This spec was further revised to correct a possible misreading of the
+`dash`/Bicrypto and `web3chainlink` reference codebases as something
+ZodiTrade could be cloned or ported from: neither is a base ZodiTrade
+builds on. ZodiTrade remains a fresh Laravel build on the sanitized
+qfsfountains base per
+[base-codebase-strategy.md](../../architecture/base-codebase-strategy.md)
+and the
+[genericization checklist](../../architecture/product-genericization-checklist.md);
+`dash`/Bicrypto and `web3chainlink` are feature/UX references only (§11.1),
+and the dual external-API/internal-engine trading-execution architecture
+(§11.2) is now the documented default for ZodiTrade's order routing. This
+spec is Foundation-depth. Queued for Deep-depth expansion: a full ER
 diagram and migration set for the order/position/settlement schema
 (companion `DATA_MODEL.md`), a complete endpoint catalog (companion
 `API_REFERENCE.md`), and a full report catalog covering additional
