@@ -49,11 +49,10 @@
 - [ ] No new PHPStan/Larastan or ESLint errors introduced; the CI static
       analysis stage in [`ci-cd-standards.md`](./ci-cd-standards.md) passes
       at the repository's configured level with zero new baseline entries.
-- [ ] No new PHP or TypeScript type errors; strict types are declared on any
-      new PHP file (`declare(strict_types=1);`) and new Vue components use
-      `<script setup lang="ts">` typed props.
-- [ ] Code formatting (Pint for PHP, Prettier/ESLint for Vue/TS) is applied;
-      no manually-formatted diff noise.
+- [ ] No new PHP type errors; strict types are declared on any new PHP file
+      (`declare(strict_types=1);`).
+- [ ] Code formatting (Pint for PHP, Prettier/ESLint for any plain JS) is
+      applied; no manually-formatted diff noise.
 
 ## Accessibility
 

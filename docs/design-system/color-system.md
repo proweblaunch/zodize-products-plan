@@ -164,4 +164,4 @@ All tokens use the `--color-*` prefix inside this document for readability;
 the fully-qualified, implementation-facing name carries the `--zdz-` product
 prefix (e.g. `--zdz-color-surface-2`). See
 [Design Tokens](./design-tokens.md) for the complete naming convention and
-the CSS-variable/Tailwind mapping used in the Laravel+Vue stack.
+the CSS-variable/Bootstrap SCSS mapping used in the Laravel+Blade stack.

@@ -38,9 +38,9 @@ authenticated application shell and public marketing pages alike:
 | Cumulative Layout Shift (CLS) | < 0.1 |
 | Time to First Byte (TTFB) | < 600ms |
 
-- The Vue SPA MUST code-split by route at minimum; any route bundle
-  exceeding 250KB gzipped MUST be justified in the PR description or split
-  further.
+- Compiled JS/CSS bundles MUST be split per page/module at minimum (no
+  single monolithic bundle loaded on every page); any bundle exceeding
+  250KB gzipped MUST be justified in the PR description or split further.
 - Plugin-contributed frontend assets are lazy-loaded only when the plugin is
   enabled for the deployment, per
   [`../architecture/plugin-architecture.md`](../architecture/plugin-architecture.md#migrations-routes-and-views),

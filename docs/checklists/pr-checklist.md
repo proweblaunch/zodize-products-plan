@@ -27,8 +27,8 @@ skipping it.
 
 ## Code quality
 
-- [ ] Code follows [`../development/coding-standards-php-laravel.md`](../development/coding-standards-php-laravel.md) and [`../development/coding-standards-vue.md`](../development/coding-standards-vue.md)
-      (Laravel and Vue conventions).
+- [ ] Code follows [`../development/coding-standards-php-laravel.md`](../development/coding-standards-php-laravel.md) and [`../development/coding-standards-frontend.md`](../development/coding-standards-frontend.md)
+      (Laravel and Blade/Bootstrap/jQuery conventions).
 - [ ] New modules follow the directory structure and layer responsibilities
       in [`../templates/module-template.md`](../templates/module-template.md).
 - [ ] No business logic in Controllers or Models beyond what

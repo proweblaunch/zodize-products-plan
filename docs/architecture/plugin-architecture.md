@@ -155,10 +155,10 @@ Every lifecycle transition is audit-logged per
   `/plugins/{slug}/` prefix with the full middleware stack (auth, throttle)
   applied automatically — a plugin cannot opt out of authentication
   middleware.
-- Plugin views/Vue or Blade components are compiled into an isolated JS
-  chunk (`assets_entry`) lazy-loaded only when the deployment has the
-  plugin enabled, so disabled plugins add zero bytes to the product's base
-  bundle — see the frontend budget in
+- Plugin Blade views/partials and any plugin-specific JS/CSS are compiled
+  into an isolated asset bundle (`assets_entry`) loaded only when the
+  deployment has the plugin enabled, so disabled plugins add zero bytes to
+  the product's base bundle — see the frontend budget in
   [`../quality/performance-standards.md`](../quality/performance-standards.md).
 
 ## Related standards

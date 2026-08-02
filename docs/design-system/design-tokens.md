@@ -2,7 +2,8 @@
 
 This document is the consolidated reference for every design token used
 across the Zodize design system, and the single place that defines how a
-token's name maps to its implementation in the Laravel + Vue stack. Every
+token's name maps to its implementation in the Laravel + Blade/Bootstrap
+stack. Every
 other document in `docs/design-system/` defines the *values*; this document
 defines the **naming convention and the delivery mechanism**.
 
@@ -100,12 +101,12 @@ the same `--zdz-` token family (`--zdz-duration-*`, `--zdz-ease-*`) so that
 motion values are consumable through the same pipeline as every other
 token.
 
-## Mapping to Tailwind / CSS Variables in Laravel + Vue
+## Mapping to Bootstrap SCSS Variables / CSS Variables in Laravel + Blade
 
-Zodize products are built on Laravel (backend) and Vue 3 (frontend) with
-Tailwind CSS as the utility layer. Tokens flow through a single pipeline so
-that a change to a value in this handbook has exactly one place to update
-in code:
+Zodize products are built on Laravel (backend) with Blade views styled by
+Bootstrap 5 and jQuery for interactivity. Tokens flow through a single
+pipeline so that a change to a value in this handbook has exactly one place
+to update in code:
 
 1. **Source of truth in code**: tokens are defined once as CSS custom
    properties in `resources/css/tokens.css` (or the shared design-system
@@ -127,54 +128,32 @@ in code:
    }
    ```
 
-2. **Tailwind config extension**: `tailwind.config.js` extends the default
-   theme by referencing the CSS variables, never by hardcoding hex/px
-   values, so Tailwind utility classes and raw CSS stay perfectly in sync:
+2. **Bootstrap SCSS variable overrides**: a product's `resources/sass/_zodize-theme.scss`
+   (compiled via the base codebase's existing Laravel Mix/Vite pipeline)
+   maps Bootstrap's own SCSS variables onto the `--zdz-*` custom
+   properties before Bootstrap's own `_variables.scss`/`_maps.scss` are
+   imported, never by hardcoding hex/px values, so Bootstrap's component
+   classes and raw CSS stay perfectly in sync:
 
-   ```js
-   // tailwind.config.js
-   module.exports = {
-     theme: {
-       extend: {
-         colors: {
-           surface: {
-             0: 'var(--zdz-color-surface-0)',
-             1: 'var(--zdz-color-surface-1)',
-             2: 'var(--zdz-color-surface-2)',
-             3: 'var(--zdz-color-surface-3)',
-             4: 'var(--zdz-color-surface-4)',
-           },
-           accent: {
-             DEFAULT: 'var(--zdz-color-accent-default)',
-             hover: 'var(--zdz-color-accent-hover)',
-             active: 'var(--zdz-color-accent-active)',
-             subtle: 'var(--zdz-color-accent-subtle)',
-           },
-         },
-         spacing: {
-           1: 'var(--zdz-space-1)', 2: 'var(--zdz-space-2)', /* ...through 24 */
-         },
-         borderRadius: {
-           sm: 'var(--zdz-radius-sm)', md: 'var(--zdz-radius-md)',
-           lg: 'var(--zdz-radius-lg)', xl: 'var(--zdz-radius-xl)',
-           full: 'var(--zdz-radius-full)',
-         },
-         zIndex: {
-           dropdown: 'var(--zdz-z-dropdown)', modal: 'var(--zdz-z-modal)',
-           toast: 'var(--zdz-z-toast)',
-         },
-       },
-     },
-   };
+   ```scss
+   // resources/sass/_zodize-theme.scss
+   $primary:    var(--zdz-color-accent-default);
+   $body-bg:    var(--zdz-color-surface-0);
+   $border-radius: var(--zdz-radius-md);
+   $spacer:     var(--zdz-space-6);
+   $zindex-modal: var(--zdz-z-modal);
+
+   @import "~bootstrap/scss/bootstrap";
    ```
 
-3. **Vue components** consume tokens exclusively through Tailwind utility
-   classes (`bg-surface-2`, `rounded-md`, `z-modal`) or, where a utility
-   class doesn't exist for the property, directly via `var(--zdz-*)` in a
-   component's `<style>` block. Raw hex values, raw px values, and raw
-   integer z-indexes MUST NOT appear in component code — this is enforced
-   in code review and MAY be enforced via a stylelint rule
-   (`declaration-property-value-disallowed-list`) in each product's CI
+3. **Blade views/components** consume tokens exclusively through Bootstrap
+   utility/component classes (`bg-body`, `rounded`, `btn-primary`) driven by
+   the SCSS variable mapping above, or, where no Bootstrap utility exists
+   for the property, directly via `var(--zdz-*)` in a scoped `<style>`
+   block or a small component-specific SCSS partial. Raw hex values, raw px
+   values, and raw integer z-indexes MUST NOT appear in view/component code
+   — this is enforced in code review and MAY be enforced via a stylelint
+   rule (`declaration-property-value-disallowed-list`) in each product's CI
    pipeline; see [`../quality/ci-cd-standards.md`](../quality/ci-cd-standards.md).
 4. **Light/dark theme switching** is handled by swapping the `--zdz-color-*`
    variable block based on a `data-theme="light"` attribute on `<html>`,

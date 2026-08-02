@@ -4,9 +4,8 @@
 
 | Layer | Tool | Scope | Required coverage |
 |---|---|---|---|
-| Unit | Pest/PHPUnit | Services, single-responsibility classes, Vue composables (Vitest) | Every Service method's happy path + every distinct business-rule branch |
-| Feature/API | Pest/PHPUnit + Laravel HTTP testing | Full HTTP request → response, including auth/authorization | Every endpoint: happy path, validation failure, authorization denial (mandatory), not-found |
-| Component | Vitest + Vue Testing Library | Vue components in isolation | Every `base/` component; any `modules/` component with conditional rendering or logic |
+| Unit | Pest/PHPUnit | Services, single-responsibility classes | Every Service method's happy path + every distinct business-rule branch |
+| Feature/API | Pest/PHPUnit + Laravel HTTP testing | Full HTTP request → response, including auth/authorization, and rendered-view assertions | Every endpoint: happy path, validation failure, authorization denial (mandatory), not-found |
 | End-to-end | Playwright | Full browser, real backend (test deployment/database) | Every critical path in the product spec's "User Journeys" section |
 | Contract | Schemathesis/Dredd-class tool | API responses vs. OpenAPI spec | Every endpoint, run in CI |
 

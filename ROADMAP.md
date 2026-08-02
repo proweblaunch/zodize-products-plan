@@ -30,7 +30,7 @@ repository. New categories require an ADR (see `docs/decisions/`).
 | Engineering Principles, Product Philosophy | Drafted |
 | Design System (brand, typography, color, spacing, tokens, components, icons, motion, dark theme, responsive, accessibility) | Drafted |
 | UX Standards (navigation, layout, dashboards, tables, forms, modals, notifications, email/SMS) | Drafted |
-| Coding Standards (Laravel, Vue), API/REST/Webhook/SDK Standards | Drafted |
+| Coding Standards (Laravel, Blade/Bootstrap), API/REST/Webhook/SDK Standards | Drafted |
 | Database, Migration, Seeder, Repository Pattern | Drafted |
 | Security, AuthN/AuthZ, RBAC, Audit Logs, Data Protection, DR | Drafted |
 | Base Codebase Strategy, Single-Tenant Deployment Model, Frontend–Backend Bridge, Product Genericization Checklist | Drafted |

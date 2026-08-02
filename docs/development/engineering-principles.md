@@ -25,9 +25,10 @@ by the inherited base engine, that is a base-codebase gap to fix once
 ## 2. Boring technology, exceptional execution
 
 Zodize does not chase frameworks. The stack is Laravel (PHP) on the backend
-and Vue on the frontend, described fully in
+and server-rendered Blade with Bootstrap 5 + jQuery on the frontend,
+described fully in
 [coding-standards-php-laravel.md](./coding-standards-php-laravel.md) and
-[coding-standards-vue.md](./coding-standards-vue.md). Differentiation comes
+[coding-standards-frontend.md](./coding-standards-frontend.md). Differentiation comes
 from the quality of implementation, the design system, and the depth of
 domain modeling — not from tooling novelty. New infrastructure requires an
 ADR (see [`docs/decisions/`](../decisions/adr-template.md)) justifying why the

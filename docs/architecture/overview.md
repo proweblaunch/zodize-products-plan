@@ -92,10 +92,14 @@ debt is fixed once in the base before the first product clones it.
 
 Every product's public-facing marketing site starts as a clone of the
 Zodize design-system frontend shell (internally derived from what shipped at
-`/home/zodize/public_html`) — a Tailwind v4 + Blade component library
-already matching [`../design-system/`](../design-system/). That frontend is
-currently static and disconnected from the base codebase's CMS; wiring it up
-is a documented, scoped task, not an assumption — see
+`/home/zodize/public_html`) — Blade views styled with Bootstrap 5 plus a
+Zodize theme layer (custom SCSS variables/overrides) already matching
+[`../design-system/`](../design-system/). The theme is a Bootstrap 5 skin,
+not a component library replacing Bootstrap — see
+[`coding-standards-frontend.md`](../development/coding-standards-frontend.md)
+for the stack baseline. That frontend is currently static and disconnected
+from the base codebase's CMS; wiring it up is a documented, scoped task,
+not an assumption — see
 [`frontend-backend-bridge.md`](./frontend-backend-bridge.md).
 
 Building a new product is therefore: clone the sanitized base, run the

@@ -14,9 +14,20 @@ features, about, contact, legal pages, per
 use **one shared frontend shell**, not a per-product reimplementation. That
 shell is the codebase at `/home/zodize/public_html` on the build server: a
 Laravel + Blade application carrying the design tokens
-([`../design-system/design-tokens.md`](../design-system/design-tokens.md)),
-Tailwind v4 configuration, and a reusable `x-zodize.*` Blade component
-library. A product's own build clones this shell alongside the sanitized
+([`../design-system/design-tokens.md`](../design-system/design-tokens.md))
+mapped onto **Bootstrap 5** (SCSS variable overrides/a shared theme
+stylesheet, per
+[`coding-standards-frontend.md`](../development/coding-standards-frontend.md))
+plus a reusable `x-zodize.*` Blade component library for markup reuse — the
+component library is a thin Blade-partial convenience layer on top of
+Bootstrap, it does not replace Bootstrap's grid/utility classes or pull in
+Tailwind. **Correction**: an earlier pass of this document described this
+shell as Tailwind-based; that was wrong for the standard going forward —
+treat every `x-zodize.*` component as Bootstrap-5-markup-plus-tokens, and
+re-confirm the literal CSS framework already compiled into
+`/home/zodize/public_html` on disk next time the build VPS is reachable,
+correcting this note if the live shell still needs to be migrated off
+Tailwind. A product's own build clones this shell alongside the sanitized
 qfsfountains base (or, for products on an alternate base per
 [`base-codebase-strategy.md`](../architecture/base-codebase-strategy.md)'s
 documented exceptions — Pay Secure for ZodiBank, novavest for
@@ -62,9 +73,9 @@ not by assuming it already exists.
 ## How a product adopts this shell
 
 1. Clone `/home/zodize/public_html`'s `resources/`, `public/`, `routes/`
-   (the marketing-facing ones), and `config/` (Tailwind/Vite config)
-   alongside that product's own backend base (qfsfountains-derived, Pay
-   Secure, Ultimate POS, or novavest, per that product's own
+   (the marketing-facing ones), and `config/` (Bootstrap SCSS/Vite build
+   config) alongside that product's own backend base (qfsfountains-derived,
+   Pay Secure, Ultimate POS, or novavest, per that product's own
    [`SPEC.md`](../products/)).
 2. Wire the CMS bridge per
    [`frontend-backend-bridge.md`](../architecture/frontend-backend-bridge.md)

@@ -8,7 +8,7 @@
 
 ## Scope
 
-This document is the floor. It applies to every Laravel service and Vue
+This document is the floor. It applies to every Laravel service and Blade
 frontend in every Zodize product — including `ZodiCore`, itself one of the
 twenty sellable products, not a shared platform — and to every plugin
 distributed through the marketplace (see
@@ -28,7 +28,7 @@ is declared production-ready (see
 |---|---|
 | A01 Broken Access Control | Every controller action MUST be gated by a Laravel Policy or Gate (see [`authentication-authorization.md`](./authentication-authorization.md)). No route may rely on hiding a UI element as its only control. On a product with multi-company/multi-branch scoping, every scoped query MUST pass through the global company/branch scope described in [`../standards/localization-i18n.md`](../standards/localization-i18n.md#multi-company--multi-branch-data-scoping). |
 | A02 Cryptographic Failures | TLS 1.2+ in transit (TLS 1.3 preferred), AES-256 at rest for any column classified `confidential` or `restricted` under [`data-protection-privacy.md`](./data-protection-privacy.md). No custom cryptography — use Laravel's `encrypter` (AES-256-CBC/GCM via `APP_KEY`) or the framework's `Hash` facade (bcrypt/argon2id) exclusively. |
-| A03 Injection | All database access MUST go through Eloquent or the query builder with bound parameters. Raw SQL (`DB::raw`, `whereRaw`) requires a code comment justifying why the builder cannot express the query and MUST NOT interpolate user input. Blade/Vue templates MUST rely on default output escaping; `{!! !!}` and `v-html` require a documented sanitization step. |
+| A03 Injection | All database access MUST go through Eloquent or the query builder with bound parameters. Raw SQL (`DB::raw`, `whereRaw`) requires a code comment justifying why the builder cannot express the query and MUST NOT interpolate user input. Blade templates MUST rely on default `{{ }}` output escaping; `{!! !!}` requires a documented sanitization step. |
 | A04 Insecure Design | New modules MUST document their threat model (who can act on what, in what role/scope) in the product SPEC before implementation, per [`../development/`](../development/) design standards. |
 | A05 Security Misconfiguration | `APP_DEBUG=false` and `APP_ENV=production` MUST be enforced in production config, verified by a CI check that fails the build if either is violated in a deploy artifact. Default framework error pages MUST NOT leak stack traces to end users. |
 | A06 Vulnerable and Outdated Components | Composer and NPM dependency audits are mandatory CI gates (see below). |
@@ -50,9 +50,9 @@ is declared production-ready (see
   directly guessable public path.
 - Every outbound API response MUST set `Content-Type` explicitly; JSON
   endpoints MUST NOT be renderable as HTML.
-- Third-party JavaScript MUST be loaded with Subresource Integrity (`integrity`
-  attribute) or bundled at build time; no unpinned CDN `<script>` tags in
-  production Vue builds.
+- Third-party JavaScript (jQuery plugins, Bootstrap, DataTables, etc.) MUST
+  be loaded with Subresource Integrity (`integrity` attribute) or bundled at
+  build time; no unpinned CDN `<script>` tags in production.
 
 ## Dependency scanning
 
@@ -61,7 +61,8 @@ schedule against `main`:
 
 - `composer audit` — fails the build on any advisory of severity `high` or
   `critical`.
-- `npm audit --audit-level=high` — same threshold for the Vue frontend.
+- `npm audit --audit-level=high` — same threshold for the compiled
+  frontend assets (Bootstrap/jQuery/build-tool dependencies).
 
 A dependency with no available fix MUST be recorded as an accepted risk in the
 product's `docs/products/<product>/SPEC.md` under a `## Open Questions`

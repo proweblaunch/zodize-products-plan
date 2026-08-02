@@ -10,14 +10,13 @@ Every product's CI pipeline runs the following stages, in order, on every
 pull request. A stage MUST fail the build (not just warn) when it detects a
 violation:
 
-1. **Lint** — Pint (PHP) and ESLint/Prettier (Vue/TypeScript) in check mode.
+1. **Lint** — Pint (PHP) and ESLint/Prettier (plain JS) in check mode.
    No auto-fix commits in CI; a failing lint stage means the author fixes it
    locally and pushes again.
 2. **Static analysis** — PHPStan/Larastan at the repository's configured
    level (minimum level 6, financial-grade and healthcare-grade products
-   MUST run at level 8) and `vue-tsc`/TypeScript strict-mode checking for
-   the frontend. No new baseline-ignored errors permitted without a review
-   comment justifying the suppression.
+   MUST run at level 8). No new baseline-ignored errors permitted without a
+   review comment justifying the suppression.
 3. **Unit tests** — fast, isolated tests (no database, no HTTP) with a
    required minimum coverage threshold of 70% for new code (measured as
    diff coverage, not whole-repository coverage, so legacy modules don't
@@ -40,10 +39,10 @@ violation:
    plus static application security testing (SAST) for the injection and
    SSRF patterns listed in
    [`../security/security-standards.md`](../security/security-standards.md#owasp-top-10-mapping).
-7. **Build** — production asset build (Vite build for the Vue SPA,
-   `composer install --no-dev --optimize-autoloader` for the backend),
-   producing the deployable artifact. The build MUST fail on any warning
-   the framework treats as fatal in production mode.
+7. **Build** — production asset build (Vite/Mix build compiling Bootstrap
+   SCSS + jQuery/JS, `composer install --no-dev --optimize-autoloader` for
+   the backend), producing the deployable artifact. The build MUST fail on
+   any warning the framework treats as fatal in production mode.
 8. **Deploy** — to the PR's preview environment (below) automatically; to
    staging on merge to `main`; to production only via the explicit release
    process.

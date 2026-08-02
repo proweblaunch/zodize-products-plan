@@ -202,14 +202,14 @@ write-optimized pipeline decoupled from the transactional data model, per
 
 ## 12. Technology
 
-Laravel (PHP) + Vue per
+Laravel (PHP) + Blade/Bootstrap/jQuery per
 [coding-standards-php-laravel.md](../../development/coding-standards-php-laravel.md)
-and [coding-standards-vue.md](../../development/coding-standards-vue.md);
+and [coding-standards-frontend.md](../../development/coding-standards-frontend.md);
 PostgreSQL with PostGIS extension for geospatial route/location data, plus
 Redis, per [database-standards.md](../../development/database-standards.md);
 a time-series-optimized table strategy for telematics position/event data;
-mobile driver app built on the shared Vue component library for
-inspections, HOS logging, and incident reporting.
+mobile driver app built with the same Bootstrap-themed views as the admin
+panel, for inspections, HOS logging, and incident reporting.
 
 ## 13. Modules & Submodules
 

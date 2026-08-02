@@ -45,7 +45,7 @@ education divisions.
 
 | Capability | Comparable to | Zodize differentiation |
 |---|---|---|
-| Student information system core | PowerSchool, Ellucian Banner, Colleague | Modern Laravel/Vue stack instead of legacy SIS platforms with decade-old UX |
+| Student information system core | PowerSchool, Ellucian Banner, Colleague | Modern Laravel/Blade/Bootstrap stack instead of legacy SIS platforms with decade-old UX |
 | Course registration/scheduling | Ellucian Banner, Workday Student | Registration built on the same rule/workflow engine used across every Zodize product |
 | Gradebook/transcript management | PowerSchool, Infinite Campus | Version-controlled transcript history with full audit trail for grade changes |
 | Tuition billing/financial aid | Nelnet Campus Commerce, Ellucian | Billing and aid share one ledger with enrollment status, avoiding the "paid but still on hold" failure mode |
@@ -207,8 +207,8 @@ service, per
 
 Laravel 11 + PHP ^8.3 per the inherited base codebase
 ([coding-standards-php-laravel.md](../../development/coding-standards-php-laravel.md)),
-with Blade/Vue for new module UI per
-[coding-standards-vue.md](../../development/coding-standards-vue.md);
+with Blade/Bootstrap/jQuery for new module UI per
+[coding-standards-frontend.md](../../development/coding-standards-frontend.md);
 MySQL/MariaDB per the base codebase's inherited schema, matching
 [database-standards.md](../../development/database-standards.md), with
 row-level locking for seat-capacity-constrained registration writes; payment

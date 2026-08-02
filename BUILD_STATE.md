@@ -116,6 +116,20 @@ established this rule.
   that already exists, rather than a from-scratch clone/genericize build.
 - `blocked` — cannot safely proceed; see the Flagged Items section for why.
 
+## Stack correction (2026-08-02)
+
+An earlier pass of this handbook incorrectly specified Vue (+ Tailwind) as
+the frontend stack in several core standards docs. **Corrected**: the real,
+binding frontend standard is server-rendered Blade + Bootstrap 5 + jQuery +
+Font Awesome (the classic ViserLab pattern), with the Zodize design tokens
+applied as a Bootstrap theme layer, not a component library replacing
+Bootstrap — see
+[`coding-standards-frontend.md`](./docs/development/coding-standards-frontend.md).
+This does **not** require any framework change in ZodiCore (Ultimate POS)
+or ZodiBank (Pay Secure) — both are already Blade/Bootstrap/jQuery Laravel
+apps. Their remaining Zodize-theme work is a Bootstrap SCSS-variable/theme
+styling pass layered on top of their existing structure, not a rebuild.
+
 ## Product ledger
 
 | Product | Status | Current step | Last updated | Next |

@@ -38,7 +38,7 @@ what is documented in this repository, the linked design system at
 
 1. `docs/development/engineering-principles.md` — how Zodize thinks about software.
 2. `docs/design-system/` — the visual and interaction language, in full.
-3. `docs/development/` — the technical standards (Laravel, Vue, API, DB, testing, git).
+3. `docs/development/` — the technical standards (Laravel, Blade/Bootstrap, API, DB, testing, git).
 4. `docs/security/` and `docs/quality/` — the non-negotiables.
 5. `docs/templates/` — the scaffolds every product starts from.
 6. `docs/products/<product>/SPEC.md` — the product you are actually building.

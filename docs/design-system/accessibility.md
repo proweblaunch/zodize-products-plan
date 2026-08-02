@@ -66,9 +66,10 @@ non-negotiable:
   duration it is open.
 - Closing a modal, drawer, or dialog MUST return focus to the element that
   triggered it.
-- Client-side route changes (SPA navigation within the Vue app) MUST move
-  focus to the new page's `h1` or a designated landmark, so screen reader
-  and keyboard users are not left focused on a now-removed element.
+- Any AJAX-driven partial page update (e.g. a jQuery-loaded panel replacing
+  content without a full page navigation) MUST move focus to the updated
+  region's `h1` or a designated landmark, so screen reader and keyboard
+  users are not left focused on a now-removed element.
 - Asynchronous content updates that are not user-initiated (e.g. a live
   ticker updating) MUST NOT steal focus from whatever the user is currently
   interacting with.

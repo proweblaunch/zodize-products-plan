@@ -105,9 +105,11 @@ exactly one of them — never duplicated across layers:
 - **routes/api.php, web.php** — this module's routes only, auto-discovered
   and mounted under the product's route prefix; a module MUST NOT register
   routes outside its own `routes/` files.
-- **resources/js** — Vue components colocated with the module they belong
-  to. Components shared across more than one module MUST be promoted to the
-  shared frontend component library, not duplicated.
+- **resources/views** — Blade views/partials for this module, and
+  **resources/js** — any module-specific jQuery/JS colocated with the
+  module they belong to. Views/scripts shared across more than one module
+  MUST be promoted to the shared frontend component library, not
+  duplicated.
 - **tests** — see [testing-template.md](./testing-template.md) for the
   mandatory coverage this directory must contain.
 

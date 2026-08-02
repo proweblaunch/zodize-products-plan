@@ -18,10 +18,10 @@ marketplace.
 
 - A product's marketplace lists three package types: **Plugins**
   (functional extensions, per
-  [`plugin-architecture.md`](./plugin-architecture.md)), **Themes** (Vue/
-  Blade component or style overrides within the design tokens defined in
-  [`../design-system/`](../design-system/) — a theme MUST NOT override
-  accessibility-critical tokens such as minimum contrast ratios), and
+  [`plugin-architecture.md`](./plugin-architecture.md)), **Themes** (Blade
+  component or Bootstrap SCSS style overrides within the design tokens
+  defined in [`../design-system/`](../design-system/) — a theme MUST NOT
+  override accessibility-critical tokens such as minimum contrast ratios), and
   **Integrations** (pre-built connectors to third-party services, packaged
   as a specialization of a plugin with `permissions` scoped to `webhooks.*`
   and outbound API credentials).
