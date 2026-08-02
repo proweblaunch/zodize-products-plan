@@ -1,11 +1,94 @@
 # ZodiTrack — Product Specification
 
-> Status: **Foundation**. Vision through acceptance criteria are complete and
-> implementation-usable; exhaustive ER diagrams and a full endpoint catalog
-> are queued — see [Roadmap (spec depth)](#roadmap-spec-depth) and
-> [PRODUCT_CATALOG.md](../../../PRODUCT_CATALOG.md).
+> Status: **Live — Extend Only**. See
+> [PRODUCT_CATALOG.md](../../../PRODUCT_CATALOG.md)'s status definition and
+> [`BUILD_STATE.md`](../../../BUILD_STATE.md)'s protocol for this status.
+> ZodiTrack is not built from this spec — it already exists as a complete,
+> working, currently-resold product. This spec is being reconciled against
+> the real live codebase; see the correction notice immediately below before
+> reading anything further in this document.
+
+## 0. Verified correction — this spec's domain does not match the live product
+
+A direct filesystem audit of the actual live codebase (confirmed present at
+`/home/script/public_html/zoditrack/` on the build VPS) found that ZodiTrack
+is **not** an internal enterprise asset/inventory-tracking (ITAM) tool as
+the rest of this document (written before that audit) describes below.
+**The real, live, currently-resold product is a customer-facing freight/
+shipment tracking and logistics brokerage website**, confirmed via direct
+inspection of its file structure and code:
+
+- Public marketing/service pages: `air-freight.php`, `ocean-freight.php`,
+  `cargo-transportation.php`, `packaging-and-storage.php`, plus standard
+  `about-us.php`, `contact.php`, `faq.php`, and legal pages
+  (`privacy-policy.php`, `terms.php`, `refund-policy.php`,
+  `shipping-policy.php`, `cookie-policy.php`).
+- A public **tracking number lookup** (`track.php`): a customer enters a
+  tracking number and sees shipment status (`Pending`, `Picked Up`,
+  `Processing`, `In Transit`, `Arrived at Facility`, `Out for Delivery`,
+  `Delivered`, `Delayed`, `Failed Delivery`, `Returned`) with a
+  status-history timeline, confirmed via direct code read of `track.php`'s
+  status-color/icon mapping and its query against a `tracking` table.
+- A `customer/` portal directory and a `receipt.php` (37KB, substantial
+  logic) generating shipment receipts.
+- A full `admin/` back office (confirmed via direct directory listing, 33
+  files) covering: `dashboard.php`, `shipments.php`, `add-tracking.php` /
+  `edit-tracking.php` (both 27–31KB — substantial shipment-entry logic),
+  `shipment-modes.php`, `branches.php`, `staff.php`, `customers.php`,
+  `vendors/`, `invoices.php`, `reports.php`, `notifications.php`,
+  `activity-log.php`, and `settings.php`.
+- The stack is confirmed **native procedural PHP** — direct database calls
+  via `mysqli` (see `db.php`, `track.php`'s `mysqli_prepare`/
+  `mysqli_stmt_bind_param` calls), page-based routing (`.php` files, not a
+  framework router), and shared `header.php`/`footer.php` includes — not
+  Laravel, not any framework. This confirms the "native procedural PHP
+  stack" characterization already given to it elsewhere in this handbook.
+
+**This means ZodiTrack is a freight-forwarding/logistics-brokerage
+shipment-tracking business (closer to a courier/freight-forwarder's
+customer-facing tracking site plus back-office shipment management), not an
+ITAM/enterprise-asset-tracking tool.** The Vision, Purpose, Target Market,
+Competitor Analysis, Personas, and User Journeys sections below (§1–§7)
+describe the WRONG domain and MUST NOT be used to guide any extension work
+until they are rewritten to match the real product. Per
+[`BUILD_STATE.md`](../../../BUILD_STATE.md)'s protocol — trust the
+filesystem over the ledger/spec when they disagree — this mismatch is
+recorded here rather than silently guessed past, and rather than this
+session fabricating a full rewrite of personas/journeys for the real
+freight-tracking business without a deeper audit of every admin screen's
+actual behavior (a partial rewrite risks being just as wrong as the
+original). A follow-up session MUST:
+
+1. Read every file under `admin/` and the customer-facing pages in full
+   (this audit confirmed their existence and rough purpose from filenames,
+   sizes, and one file's content — `track.php` — not their complete
+   behavior).
+2. Rewrite §1–§7 (Vision through Business Goals) to describe the real
+   freight/shipment-tracking business.
+3. Populate the "Gap list" section below with a genuine
+   feature-by-feature comparison once the rest of this document is
+   rewritten to match — a gap list against the WRONG domain description is
+   not meaningful.
+
+Everything from §8 onward in this document (Functional Requirements
+through the closing Roadmap) was written against the incorrect ITAM framing
+and needs the same reconciliation pass.
+
+## Gap list (populate after §1–§7 are corrected)
+
+**Not yet populated**, per the reasoning above. Confirmed-present
+capabilities that any rewritten spec/gap-list MUST account for as already
+built (not gaps): tracking-number lookup with status history, shipment
+CRUD (`add-tracking.php`/`edit-tracking.php`), shipment modes, branches,
+staff, customers, vendors, invoicing, reporting, in-admin notifications,
+an activity log, and a settings screen. Nothing in this list should be
+proposed as new work without first confirming it isn't already implemented
+under a different name.
 
 ## 1. Vision
+
+> **The section below (through §7) describes the wrong domain — see the
+> correction notice in §0 above. Do not use it to guide extension work.**
 
 ZodiTrack is the asset and inventory tracking system for organizations that
 own physical things across many locations — equipment, tools, IT hardware,

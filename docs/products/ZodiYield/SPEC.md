@@ -8,17 +8,46 @@
 > this document. See [PRODUCT_CATALOG.md](../../../PRODUCT_CATALOG.md) for
 > spec status definitions.
 
-ZodiYield is a standalone, self-hosted Laravel application built by cloning
-the sanitized [base codebase](../../architecture/base-codebase-strategy.md),
-running the
-[genericization checklist](../../architecture/product-genericization-checklist.md)
-to strip the base engine's banking-specific loan/DPS/FDR/branch tables, and
-layering lending-domain modules on top. It does not depend on any other
+Unlike most other products in the catalog, ZodiYield is **not** built by
+cloning the sanitized [base codebase](../../architecture/base-codebase-strategy.md)
+(the qfsfountains-sourced "ViserBank/ViserLab Core Engine") through the
+standard [genericization checklist](../../architecture/product-genericization-checklist.md)
+pipeline. A direct filesystem audit of the build server confirmed an
+existing Laravel codebase at `/home/novavest/public_html/core/` — complete
+with `app/`, `artisan`, `composer.json`, `bootstrap/`, `config/`,
+`database/`, `resources/`, `routes/`, `storage/`, `vendor/`, and a
+`.env`/`.env.example` — sitting alongside a `/home/novavest/public_html/assets/`
+directory. That `assets/` + `core/` split is the same structural convention
+[base-codebase-strategy.md](../../architecture/base-codebase-strategy.md#directory-structure)
+documents for the qfsfountains base, a strong signal this "novavest"
+codebase is itself Zodize-lineage rather than an unrelated third codebase,
+even though its `composer.json` still carries the generic `laravel/laravel`
+boilerplate package name and its `README.md` is unmodified Laravel
+boilerplate — neither file confirms a specific product identity on its own.
+ZodiYield is therefore based on and improved from novavest/core, similar in
+spirit to how ZodiBank is built on "Pay Secure" instead of the qfsfountains
+base (see [ZodiBank's SPEC.md §11](../ZodiBank/SPEC.md#11-architecture)) —
+a deliberate, documented exception to the standard "every product clones
+qfsfountains" pipeline, not a contradiction of it. Unlike Pay Secure,
+however, novavest is not a shipped/sold commercial product; it is an
+existing internal build, so this is more accurately "extend an existing
+internal codebase" than "Live — Extend Only" in the sense
+[BUILD_STATE.md](../../../BUILD_STATE.md) uses for ZodiTrack. See
+[Open Questions](#open-questions) for what a follow-up session must still
+audit before building on top of it. ZodiYield does not depend on any other
 Zodize product or on a central "ZodiCore" platform for identity, billing,
 notifications, or tenancy — see
 [single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md).
 `ZodiCore` is itself just another standalone product in the catalog (a
 general-purpose back-office/ERP starter), not a platform ZodiYield runs on.
+
+**Shared foundation with ZodiCapital**: [ZodiCapital](../ZodiCapital/SPEC.md)
+is also based on and improved from the same novavest/core codebase. A
+session working on either product's novavest-derived infrastructure (RBAC,
+KYC, wallet/ledger, or any shared scaffolding novavest already provides)
+MUST check [ZodiCapital's SPEC.md §11](../ZodiCapital/SPEC.md#11-architecture)
+and this document's own audit findings first, so the two products don't
+independently reinvent overlapping novavest infrastructure.
 
 ## 1. Vision
 
@@ -171,32 +200,56 @@ inherited baseline. ZodiYield-specific additions:
 
 ## 11. Architecture
 
-ZodiYield is built by cloning the sanitized
-[base codebase](../../architecture/base-codebase-strategy.md) — a single,
-independent Laravel application the buyer deploys entirely on their own
-shared/VPS hosting, per
-[single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md).
-Building ZodiYield means running the full
-[genericization checklist](../../architecture/product-genericization-checklist.md):
-the inherited `loans`/`dps`/`fdr`/`branches`/`other_banks` tables and
-controllers are stripped, and ZodiYield builds its own origination,
-servicing, and collections modules from scratch rather than reusing the
-base engine's banking-specific loan tables — those tables model a bank's
-own deposit-taking loan book and don't carry the underwriting/disclosure/
-collections lifecycle ZodiYield needs. ZodiYield keeps and builds on top of
-the base engine's RBAC/auth (`Role`/`Permission` models), KYC, i18n, and
-admin configuration surface (see
-[base-codebase-strategy.md](../../architecture/base-codebase-strategy.md#inherited-as-is-the-admin-engine-every-product-keeps)).
+ZodiYield is based on and improved from the existing "novavest" Laravel
+application at `/home/novavest/public_html/core/`, a single, independent
+codebase the buyer deploys entirely on their own shared/VPS hosting, per
+[single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md)
+— **not** a clone of the sanitized
+[base codebase](../../architecture/base-codebase-strategy.md) run through
+the [genericization checklist](../../architecture/product-genericization-checklist.md),
+as most other products are. This was confirmed by a direct filesystem audit
+of the build server: novavest/core has the standard Laravel skeleton
+(`app/`, `artisan`, `composer.json`, `bootstrap/`, `config/`, `database/`,
+`resources/`, `routes/`, `storage/`, `vendor/`) and a sibling
+`novavest/assets/` directory, matching the same `assets/` + `core/` split
+[base-codebase-strategy.md](../../architecture/base-codebase-strategy.md#directory-structure)
+documents for the qfsfountains base — meaning novavest is very likely
+Zodize-lineage itself, not a from-scratch third codebase, even though
+neither its `README.md` (unmodified Laravel boilerplate) nor its
+`composer.json` (generic `laravel/laravel` package name) confirms a
+specific prior product identity.
 
-On that foundation, ZodiYield adds its own domain modules — Origination,
+**What the audit has and has not established.** The audit confirmed
+novavest/core's directory shape and Laravel/framework identity. It did
+**not** deeply inspect `novavest/core/app/` or
+`novavest/core/database/migrations/` against ZodiYield's own lending
+requirements (§9, §14) — whether novavest already has RBAC/auth
+(`Role`/`Permission` models), KYC, wallet/ledger, or any origination,
+underwriting, servicing, or collections functionality is unknown until that
+audit runs. See [Open Questions](#open-questions). Do **not** assume
+novavest lacks these systems and rebuild them from the qfsfountains base's
+inherited-engine list — that would risk building duplicate infrastructure
+on top of a codebase that may already have its own. Equally, do not assume
+novavest already covers ZodiYield's lending mechanics without checking; the
+correct next step is a concrete gap list (spec requirement → present/absent
+in novavest), the same audit-before-build approach
+[BUILD_STATE.md](../../../BUILD_STATE.md) documents for ZodiTrack's
+Live-Extend-Only status, adapted here for an existing internal codebase
+rather than an already-shipped product.
+
+Once that gap list exists, ZodiYield's own domain modules — Origination,
 Underwriting, Servicing, Collections, Interest Rate Products,
-Compliance/Disclosures, and Borrower Portal — as new, clearly bounded
-modules per [module-template.md](../../templates/module-template.md),
-registering into the inherited audit log and RBAC policy registry.
-Underwriting/credit-bureau integration runs behind an
-`UnderwritingProviderContract` so a lender can swap or A/B test decision
-engines without touching loan ledger logic, and payment processing runs as
-a queued worker (per
+Compliance/Disclosures, and Borrower Portal — are added as new, clearly
+bounded modules per [module-template.md](../../templates/module-template.md),
+reusing whatever RBAC/audit/KYC/wallet infrastructure the audit finds
+already present in novavest rather than building parallel systems, and
+building fresh only what the gap list shows is actually missing —
+particularly the underwriting/disclosure/collections lifecycle, which is
+unlikely to already exist in a general investment-platform codebase but
+MUST be confirmed absent rather than assumed. Underwriting/credit-bureau
+integration runs behind an `UnderwritingProviderContract` so a lender can
+swap or A/B test decision engines without touching loan ledger logic, and
+payment processing runs as a queued worker (per
 [caching-queues-events.md](../../architecture/caching-queues-events.md))
 isolated from the request path for retry resilience, with a synchronous
 fallback for buyers on hosting without persistent worker support. ZodiYield
@@ -204,6 +257,12 @@ has no runtime dependency on any other Zodize product or on a
 Zodize-operated central service; the only external dependencies are the
 third-party credit bureau, underwriting, and payment-rail integrations the
 buyer's own lending operation configures (§22).
+
+**Shared foundation with ZodiCapital**: both ZodiYield and
+[ZodiCapital](../ZodiCapital/SPEC.md) are based on and improved from this
+same novavest/core codebase. A future session auditing novavest's `app/` or
+`database/migrations/` for one product SHOULD share findings with the
+other's SPEC.md rather than re-running the same filesystem audit twice.
 
 ## 12. Technology
 
@@ -236,8 +295,23 @@ column anywhere in this model — each deployed instance belongs to exactly
 one lender, per
 [single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md#what-single-tenant-changes-in-the-data-model).
 These `loans`/`loan_products` tables are ZodiYield's own domain tables,
-distinct from (and not derived from) the base engine's banking-specific
-`loans`/`loan_plans` tables, which ZodiYield strips per §11.
+distinct from (and not derived from) the qfsfountains base engine's
+banking-specific `loans`/`loan_plans` tables — which are irrelevant here
+regardless, since ZodiYield is based on novavest/core, not that base
+codebase (see §11).
+
+**These entities describe what ZodiYield needs, not what novavest already
+has.** They were designed against ZodiYield's own functional requirements
+(§9), not against novavest's actual existing schema — novavest's
+`database/migrations/` has not yet been audited (see
+[Open Questions](#open-questions)). Before finalizing any new migration for
+the tables below, a session with real access to
+`novavest/core/database/migrations/` MUST check for overlap: novavest may
+already have equivalent (or partially equivalent) borrower, loan, or
+ledger tables under different names, in which case the correct move is to
+extend or rename what exists rather than create a duplicate table
+alongside it. Treat every table name below as a proposal pending that
+audit, not as confirmed net-new schema.
 
 | Entity | Key columns |
 |---|---|
@@ -526,16 +600,46 @@ before go-live.
 - Machine-learning-assisted collections next-best-action recommendations
   beyond the current prioritization assistant.
 
+## Open Questions
+
+- **Novavest's exact existing feature set needs a deeper audit.** The
+  filesystem audit backing §11 confirmed `/home/novavest/public_html/core/`
+  is a Laravel application with the standard `assets/` + `core/` structural
+  split, but it did not inspect `novavest/core/app/` or
+  `novavest/core/database/migrations/` in depth. A follow-up session MUST
+  audit both against this SPEC.md's requirements (§9 Functional
+  Requirements, §14 Core Data Model) — origination, underwriting,
+  amortization/servicing, collections, disclosures, RBAC/auth, KYC, and
+  wallet/ledger — and produce a concrete gap list (requirement → present/
+  absent/partial in novavest) before any new migration or module is built.
+  Until that audit runs, treat every "novavest already has X" or "ZodiYield
+  must build Y fresh" statement in this document as unverified against the
+  real codebase, not as a completed audit result.
+- **Overlap with ZodiCapital's own novavest audit.** Because
+  [ZodiCapital](../ZodiCapital/SPEC.md) shares the same novavest/core
+  foundation, whichever session performs the novavest audit first SHOULD
+  record shared findings (RBAC, KYC, wallet/ledger, or any other
+  cross-cutting infrastructure novavest already provides) somewhere both
+  specs can reference, so the second product's audit doesn't repeat work
+  already done for the first.
+
 ## Roadmap (spec depth)
 
 This spec's Architecture and Core Data Model sections were revised to
 reflect the corrected standalone, self-hosted, single-tenant deployment
 model — see
 [single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md)
-and [base-codebase-strategy.md](../../architecture/base-codebase-strategy.md).
-This spec is Foundation-depth. Queued for Deep-depth expansion: a full ER
-diagram and migration set for the loan/servicing/collections schema
-(companion `DATA_MODEL.md`), a complete endpoint catalog including the full
-borrower portal surface (companion `API_REFERENCE.md`), and a full
-regulatory disclosure catalog covering jurisdictions beyond the US
-TILA-style baseline. Changes follow [CONTRIBUTING.md](../../../CONTRIBUTING.md).
+and [base-codebase-strategy.md](../../architecture/base-codebase-strategy.md)
+— and subsequently revised again to reflect the verified ground truth that
+ZodiYield is based on and improved from the existing novavest/core codebase
+(see §11) rather than cloned from the sanitized qfsfountains base, a
+deliberate exception to the standard pipeline documented alongside
+ZodiBank's equivalent "Pay Secure" exception. This spec is Foundation-depth.
+Queued for Deep-depth expansion, now gated on the novavest audit in
+[Open Questions](#open-questions): a full ER diagram and migration set for
+the loan/servicing/collections schema reconciled against whatever novavest
+already has (companion `DATA_MODEL.md`), a complete endpoint catalog
+including the full borrower portal surface (companion `API_REFERENCE.md`),
+and a full regulatory disclosure catalog covering jurisdictions beyond the
+US TILA-style baseline. Changes follow
+[CONTRIBUTING.md](../../../CONTRIBUTING.md).

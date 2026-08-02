@@ -8,19 +8,33 @@
 > this document. See [PRODUCT_CATALOG.md](../../../PRODUCT_CATALOG.md) for
 > spec status definitions.
 
-ZodiBank is a standalone, self-hosted Laravel application built by cloning
-the sanitized [base codebase](../../architecture/base-codebase-strategy.md)
-and layering banking-domain modules on top. Unlike every other product in
-the catalog, ZodiBank does **not** run the
-[genericization checklist's](../../architecture/product-genericization-checklist.md)
-loan/DPS/FDR removal step — it keeps and extends the base engine's inherited
-loan, DPS, and FDR tables as its own core banking modules, rather than
-stripping them. It does not depend on any other Zodize product or on a
-central "ZodiCore" platform for identity, billing, notifications, or
+ZodiBank is a standalone, self-hosted Laravel application. Unlike every
+other product in the catalog, ZodiBank is **not** cloned from the sanitized
+[base codebase](../../architecture/base-codebase-strategy.md) (the
+qfsfountains-sourced "ViserBank/ViserLab Core Engine"). A direct filesystem
+audit of ZodiBank's actual codebase on the build server
+(`/home/script/public_html/zodibank/`) confirmed it is instead built on a
+separate, already-feature-complete commercial Laravel banking product
+internally called "Pay Secure," using the `nwidart/laravel-modules` package
+(a `Modules/` directory, each module a self-contained unit with its own
+`composer.json`, `module.json`, `app/`, `config/`, `database/`, `resources/`,
+`routes/`, and `tests/`) rather than the base codebase's flat, non-modular
+namespace layout. See [§11 Architecture](#11-architecture) for what this
+means concretely and [§13 Modules & Submodules](#13-modules--submodules) for
+what Pay Secure already provides versus what ZodiBank's own domain modules
+must build fresh. ZodiBank does not depend on any other Zodize product or on
+a central "ZodiCore" platform for identity, billing, notifications, or
 tenancy — see
 [single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md).
 `ZodiCore` is itself just another standalone product in the catalog (a
 general-purpose back-office/ERP starter), not a platform ZodiBank runs on.
+Because ZodiBank does not share the base codebase, none of the "inherited
+as-is" or "must be stripped" guidance in
+[base-codebase-strategy.md](../../architecture/base-codebase-strategy.md)
+applies to it directly — every reference below to something Pay Secure
+"already has" or ZodiBank "must build" comes from the direct audit of
+ZodiBank's own codebase, not from the base-codebase inheritance model every
+other product follows.
 
 ## 1. Vision
 
@@ -61,8 +75,8 @@ programs.
 
 | Capability | Comparable to | Zodize differentiation |
 |---|---|---|
-| Core banking ledger | Mambu, Thought Machine (Vault), Temenos | Ships with RBAC/audit/wallet-ledger already built into the inherited base codebase, no separate identity integration project |
-| Digital account origination | nCino, Narmi, Alkami | Deposit onboarding and KYC/AML wired directly into the base engine's KYC and audit model from day one |
+| Core banking ledger | Mambu, Thought Machine (Vault), Temenos | Ships on Pay Secure's already-working RBAC/wallet-ledger/audit foundation (§11), no separate identity integration project |
+| Digital account origination | nCino, Narmi, Alkami | Deposit onboarding and KYC/AML wired directly into Pay Secure's existing KYC and audit model from day one |
 | Card issuing/processing | Marqeta, Galileo, i2c | Card issuing module shares one permission and audit model with the rest of the bank's operations, not a bolted-on processor console |
 | BaaS/sponsor-bank platforms | Unit, Treasury Prime, Synctera | Each buyer runs their own fully independent, self-hosted deployment, so a program layers custom compliance rules on its own codebase without forking anyone else's ledger code |
 | Regulatory/call reporting | Ncontracts, Abrigo | Call-report-style extracts generated directly from the same ledger of record, not a reconciled shadow system |
@@ -179,30 +193,74 @@ inherited baseline. ZodiBank-specific additions:
 
 ## 11. Architecture
 
-ZodiBank is built by cloning the sanitized
-[base codebase](../../architecture/base-codebase-strategy.md) — a single,
-independent Laravel application the buyer deploys entirely on their own
-shared/VPS hosting, per
-[single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md).
-It inherits the base engine's wallet/ledger, payment gateways, RBAC/auth
-(`Role`/`Permission` models), KYC, i18n, admin configuration surface, and
-audit logging as-is (see
-[base-codebase-strategy.md](../../architecture/base-codebase-strategy.md#inherited-as-is-the-admin-engine-every-product-keeps)).
+ZodiBank runs on "Pay Secure," a separate, already-feature-complete
+commercial Laravel banking codebase — **not** a clone of the sanitized
+[base codebase](../../architecture/base-codebase-strategy.md) that every
+other Zodize product starts from. This was confirmed by a direct filesystem
+audit of the actual build server at `/home/script/public_html/zodibank/`:
+the codebase has the standard Laravel skeleton (`app/`, `artisan`,
+`composer.json`, `bootstrap/`, `config/`, `database/`, `routes/`, `vendor/`)
+plus a `Modules/` directory following the `nwidart/laravel-modules` pattern,
+each module a self-contained unit with its own `composer.json`,
+`module.json`, `app/`, `config/`, `database/`, `resources/`, `routes/`, and
+`tests/` — a materially different architecture from the base codebase's flat,
+non-modular namespace layout described in
+[base-codebase-strategy.md](../../architecture/base-codebase-strategy.md#directory-structure).
+It is deployed entirely on the buyer's own shared/VPS hosting, per
+[single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md),
+the same as every other product, but that deployment model is where the
+similarity to the base-codebase pipeline ends.
 
-ZodiBank is the one product in the catalog that does **not** run
-[Step 2 of the genericization checklist](../../architecture/product-genericization-checklist.md#step-2--strip-banking-domain-specific-tables-models-and-controllers):
-it keeps the base engine's `loans`/`loan_plans`, `dps`/`dps_plans`, and
-`fdr`/`fdr_plans` tables and controllers, and re-adds them as its own
-first-class domain modules — Deposit Accounts, General Ledger, Card
-Issuing, Payments, Onboarding & Compliance, Fraud, Regulatory Reporting, and
-Overdraft/NSF — built on top of the genericized `Plan` model per
-[base-codebase-strategy.md](../../architecture/base-codebase-strategy.md#genericizing-the-plan-pattern),
-rather than being stripped and rebuilt from zero. These domain modules
-consume the inherited wallet/ledger engine (extended per §14's
-multi-currency note), RBAC, KYC, and audit log the same way any other
-application code does — they never fork or duplicate an inherited
-controller/model to add banking behavior. Card authorization and ACH/wire
-processing run as dedicated queued workers (per
+**Already present in Pay Secure, confirmed by the audit** (build on these,
+do not rebuild them):
+
+- Two nwidart modules: `Modules/Agent` and `Modules/Merchant`, each a full
+  module with its own routes, migrations, and tests.
+- Payment gateway packages in `composer.json`: `authorizenet/authorizenet`
+  (Authorize.Net), `flutterwavedev/flutterwave-v3` (Flutterwave),
+  `coingate/coingate-php` (CoinGate), and `cinetpay/cinetpay-php` (CinetPay)
+  — see [§22 Integrations](#22-integrations). Notably, Flutterwave is
+  **confirmed present** in ZodiBank's own codebase; this is independent of
+  the open Flutterwave/Paystack verification item
+  [payment-gateways.md](../../standards/payment-gateways.md#flutterwave-and-paystack--required-for-zodizes-primary-market)
+  flags for the shared qfsfountains base — that item concerns a different
+  codebase entirely and does not apply to ZodiBank.
+- Supporting packages: `aws/aws-sdk-php`, `barryvdh/laravel-dompdf`,
+  `google/auth`, `guzzlehttp/guzzle`.
+- Firebase push notification integration: `firebase-messaging-sw.js` and a
+  `firebase-service.json` credential file at the codebase root, wired for
+  web push (see [§17 Notifications](#17-notifications-emails-sms-push)).
+
+**Confirmed absent, and therefore new work** — a direct code search of
+Pay Secure's `app/` directory found no fixed-deposit-receipt ("fdr") code
+and no equivalent code for DPS, formal account-number generation, staff, or
+branch/loan management anywhere in the codebase. These are not inherited
+from anywhere; ZodiBank's own domain modules — Deposit Accounts, General
+Ledger, Card Issuing, Payments, Onboarding & Compliance, Fraud, Regulatory
+Reporting, and Overdraft/NSF — must implement Fixed Deposit Receipt (FDR),
+Deposit Pension Scheme (DPS), account-number generation, and staff/branch
+management fresh, against Pay Secure's `nwidart/laravel-modules` foundation
+(as new `Modules/*` packages, following the shape of the existing `Agent`
+and `Merchant` modules), modeled on the equivalent functionality documented
+in
+[base-codebase-strategy.md's "must be stripped" list](../../architecture/base-codebase-strategy.md#must-be-stripped-domain-specific-tables-that-dont-transfer)
+for the *other*, qfsfountains-sourced base codebase (which already has
+`loans`/`loan_plans`, `dps`/`dps_plans`, `fdr`/`fdr_plans`, and
+`branches`/`branch_staff` natively, and which every other product strips).
+ZodiBank is the one product needing this class of functionality, but — because
+its actual foundation is Pay Secure, not qfsfountains — it must be built as
+new module code rather than assumed to already exist or copied wholesale
+from the other codebase's tables and controllers.
+
+ZodiBank's domain modules move money exclusively through a `Transaction`
+ledger pattern equivalent to the one documented in
+[wallet-system.md](../../standards/wallet-system.md) — Pay Secure's own
+wallet/ledger implementation MUST be audited against that standard's
+invariants (append-only, post-balance-snapshot) before any domain module is
+built on top of it, since Pay Secure's ledger has not been assumed
+equivalent to the qfsfountains base engine's `Transaction` model without
+direct verification. Card authorization and ACH/wire processing run as
+dedicated queued workers (per
 [caching-queues-events.md](../../architecture/caching-queues-events.md))
 isolated from the request path, with a synchronous fallback for buyers on
 hosting without persistent worker support, so a processor outage degrades
@@ -210,7 +268,8 @@ gracefully instead of blocking the core app. ZodiBank has no runtime
 dependency on any other Zodize product or on a Zodize-operated central
 service; the only external dependencies are the third-party KYC, card
 processor, and payment-rail integrations the buyer's own institution
-configures (§22).
+configures (§22), plus the Fincra integration documented in
+[FINCRA_INTEGRATION.md](./FINCRA_INTEGRATION.md).
 
 ## 12. Technology
 
@@ -225,6 +284,19 @@ behind contracts (see §21) so no processor is hard-coded into ledger logic.
 
 ## 13. Modules & Submodules
 
+**Already present in Pay Secure** (confirmed by audit, not built by
+ZodiBank's own team):
+
+| Module | Status |
+|---|---|
+| `Modules/Agent` | Existing nwidart module, full agent workflow already implemented |
+| `Modules/Merchant` | Existing nwidart module, full merchant workflow already implemented |
+| Payment gateways | Authorize.Net, Flutterwave, CoinGate, CinetPay already integrated (§11, §22) |
+| Push notifications | Firebase web push already wired (`firebase-messaging-sw.js`, `firebase-service.json`) |
+
+**New domain modules ZodiBank must build**, as `Modules/*` nwidart packages
+against Pay Secure's foundation:
+
 | Module | Submodules |
 |---|---|
 | Deposit Accounts | Account Products, Sub-Accounts/Buckets, Holds, Interest Accrual, Statements |
@@ -235,6 +307,21 @@ behind contracts (see §21) so no processor is hard-coded into ledger logic.
 | Fraud | Rule Engine, Review Queue, Case Disposition |
 | Regulatory Reporting | Call-Report Extracts, SAR/CTR Case Tracking, Exam Packages |
 | Overdraft/NSF | Overdraft Opt-In, Linked-Account Sweep, NSF Fees, Return-Item Processing |
+| Fixed Deposit Receipt (FDR) | FDR Plans, Issuance, Maturity/Rollover, Early-Withdrawal Penalty |
+| Deposit Pension Scheme (DPS) | DPS Plans, Recurring Contribution Scheduling, Maturity Payout |
+| Account Numbers | Account/Routing Number Generation, Uniqueness Enforcement, Format Configuration |
+| Staff & Branches | Branch Registry, Branch Staff Accounts, Branch-Scoped Permissions |
+
+None of the four new modules in the second table (FDR, DPS, Account
+Numbers, Staff & Branches) exist anywhere in Pay Secure's `app/` directory
+today — confirmed by a direct code search that found no "fdr" code and no
+equivalent DPS, account-number, staff, or branch code. They are modeled on
+the equivalent qfsfountains base-codebase tables/controllers described in
+[base-codebase-strategy.md](../../architecture/base-codebase-strategy.md#must-be-stripped-domain-specific-tables-that-dont-transfer)
+(`loans`/`loan_plans`, `dps`/`dps_plans`, `fdr`/`fdr_plans`,
+`branches`/`branch_staff`), but must be implemented as fresh code against
+Pay Secure's `nwidart/laravel-modules` structure, not copied from or assumed
+inherited from that other codebase.
 
 ## 14. Core Data Model
 
@@ -258,6 +345,22 @@ one bank/credit union, per
 | `statements` | id, account_id, period_start, period_end, pdf_document_id, generated_at |
 | `fraud_cases` | id, transaction_id, rule_triggered, status, disposition, reviewed_by, reviewed_at |
 | `regulatory_reports` | id, report_type, period, status, generated_by, exported_at |
+
+**FDR/DPS/staff/branch entities are intentionally not yet in the 12-entity
+table above.** They belong to the new modules listed in
+[§13](#13-modules--submodules) (Fixed Deposit Receipt, Deposit Pension
+Scheme, Account Numbers, Staff & Branches), none of which exist in Pay
+Secure's codebase today, and their schemas are queued for the same
+Deep-depth ER diagram pass noted in
+[Roadmap (spec depth)](#roadmap-spec-depth) — at minimum they will include
+an `fdr_accounts`/`fdr_plans` pair (principal, rate, term, maturity date,
+rollover flag), a `dps_accounts`/`dps_plans` pair (contribution amount,
+frequency, maturity payout), a `branches`/`branch_staff` pair (branch
+identity, staff-to-branch assignment, branch-scoped permission overrides on
+top of the base `Role`/`Permission` model), and an account-number generation
+service that assigns each `deposit_accounts` row its `account_number` per an
+admin-configurable format rather than the ad hoc numbering Pay Secure
+currently has no equivalent for.
 
 **Multi-currency**: ZodiBank's primary target market (§3) is US-style
 digital banks, credit unions, and sponsor-bank programs reporting in one
@@ -399,12 +502,27 @@ level append-only constraints so audit and ledger integrity cannot diverge.
 - **Payment rails**: ACH origination/receipt via an ACH processor
   integration, wire transfer via a correspondent-bank/Fedwire-class
   integration, abstracted behind a `PaymentRailContract`.
+- **Payment gateways already present in Pay Secure** (confirmed by audit,
+  see §11): Authorize.Net, Flutterwave, CoinGate, and CinetPay, configured
+  the same admin-panel way as every other gateway per
+  [payment-gateways.md](../../standards/payment-gateways.md) and
+  [admin-configuration-baseline.md](../../standards/admin-configuration-baseline.md).
+- **Fincra** (Nigerian/African payments infrastructure): a new integration
+  module — Payins, Payouts, Virtual Accounts, and Identity Management, each
+  independently admin-toggleable — documented in
+  [FINCRA_INTEGRATION.md](./FINCRA_INTEGRATION.md). Virtual Accounts ties
+  into the new Account Numbers module (§13); Identity Management ties into
+  the base engine's KYC form-builder per
+  [admin-configuration-baseline.md](../../standards/admin-configuration-baseline.md#kyc).
 - **Core banking / ledger reconciliation**: optional export connectors for
   institutions running ZodiBank's self-hosted deployment alongside a legacy
   core during migration.
 - **Credit bureau / identity verification**: for products offering
   overdraft lines or secured credit, integrates with credit bureau APIs.
 - **Tax reporting**: 1099-INT-style annual summary export.
+- **Push notifications**: Firebase already integrated at the codebase root
+  (`firebase-messaging-sw.js`, `firebase-service.json`) for web push — see
+  [§17](#17-notifications-emails-sms-push).
 
 ## 23. AI Features
 
@@ -538,14 +656,20 @@ requirements before go-live.
 
 ## Roadmap (spec depth)
 
-This spec's Architecture and Core Data Model sections were revised to
-reflect the corrected standalone, self-hosted, single-tenant deployment
-model — see
-[single-tenant-deployment-model.md](../../architecture/single-tenant-deployment-model.md)
-and [base-codebase-strategy.md](../../architecture/base-codebase-strategy.md).
-This spec is Foundation-depth. Queued for Deep-depth expansion: a full ER
-diagram and migration set for the ledger and compliance schema (companion
-`DATA_MODEL.md`), a complete endpoint catalog (companion `API_REFERENCE.md`),
-and a full regulatory report catalog covering additional jurisdictions
-beyond the US call-report format. Changes follow
+This spec's Architecture, Modules & Submodules, and Core Data Model
+sections were revised to reflect a verified filesystem audit of ZodiBank's
+actual build-server codebase: it runs on "Pay Secure," a separate,
+already-feature-complete `nwidart/laravel-modules`-based Laravel banking
+codebase — not a clone of the sanitized
+[base codebase](../../architecture/base-codebase-strategy.md) every other
+Zodize product starts from. See §11 for the full correction. This spec is
+Foundation-depth. Queued for Deep-depth expansion: a full ER diagram and
+migration set for the ledger and compliance schema, including the new FDR,
+DPS, account-number, and staff/branch modules (companion `DATA_MODEL.md`), a
+complete endpoint catalog (companion `API_REFERENCE.md`), a full regulatory
+report catalog covering additional jurisdictions beyond the US call-report
+format, and an audit of Pay Secure's own wallet/ledger implementation
+against [wallet-system.md](../../standards/wallet-system.md)'s invariants
+(not yet independently verified beyond the confirmed absence of FDR/DPS/
+account-number/staff/branch code). Changes follow
 [CONTRIBUTING.md](../../../CONTRIBUTING.md).

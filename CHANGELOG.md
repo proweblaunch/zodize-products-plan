@@ -8,6 +8,108 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added — Zodize MCP Server build-VPS access; ZodiCore/ZodiTrack/ZodiBank verified-fact corrections
+
+- Resolved the previously-flagged environment blocker: the Zodize MCP
+  Server now provides real filesystem access to the build VPS
+  (`/home/script/public_html/`, `/home/qfsfountains/`, `/home/zodize/`,
+  `/home/novavest/`, `/home/dash/`, `/home/web3chainlink/`, etc.). Updated
+  `BUILD_STATE.md` to record this resolution and to add per-product rows
+  for ZodiBank, ZodiCore, ZodiCapital, ZodiYield, and ZodiTrack reflecting
+  direct filesystem audit findings, plus a new protocol rule (7) covering
+  alternate-base products.
+- **Corrected `docs/products/ZodiCore/SPEC.md`'s Architecture, Technology,
+  and Modules sections**: a direct audit found ZodiCore's real codebase is
+  built on "Ultimate POS," not the sanitized qfsfountains base, with **22
+  addon modules already installed and active** (confirmed via
+  `modules_statuses.json` and Laravel's own `bootstrap/cache/*_module.php`
+  service-provider caches) — correcting the prior task premise that these
+  were only staged as zip files awaiting installation. Recorded the 3
+  known bugs (cheque due-date field, language-specific spacing, customer/
+  supplier creation error), the confirmed-404 public front pages, and
+  flagged the reported license/piracy-marker concern as **unconfirmed** in
+  this pass (not found by text search, which is not the same as
+  disproven) — tracked as a parallel, non-blocking security task in
+  `BUILD_STATE.md`'s Flagged Items.
+- **Corrected `docs/products/ZodiTrack/SPEC.md`**: a direct audit of the
+  live codebase found it is a freight/shipment-tracking and logistics-
+  brokerage website (public tracking-number lookup, freight service pages,
+  a 33-file admin back office covering shipments/branches/staff/customers/
+  vendors/invoices/reports) — **not** the ITAM/enterprise-asset-tracking
+  tool the existing spec (§1–§7) describes. Added a prominent correction
+  notice (new §0) rather than fabricating a full rewrite without a deeper
+  audit; flagged for a follow-up session to complete. Updated
+  `PRODUCT_CATALOG.md`'s ZodiTrack pitch to reflect this.
+- Added `docs/standards/frontend-standard.md`: the shared-frontend-shell
+  rule (one design system, twenty-plus products), grounded in a direct
+  audit of `/home/zodize/public_html`'s actual component library —
+  correcting `docs/architecture/frontend-backend-bridge.md`'s prior,
+  unaudited claim of 20 components down to the **8 actually confirmed to
+  exist** (`button`, `badge`, `card`, `input`, `textarea`, `container`,
+  `section`, `nav.header`).
+- Updated `ROADMAP.md`'s build order: removed ZodiCore, ZodiBank,
+  ZodiCapital, and ZodiYield from the from-scratch build queue (all four
+  are alternate-base audit/extend products, not qfsfountains clones), added
+  ZodiChain to the queue, and renumbered accordingly.
+
+### Added — ZodiChain product spec; dual trading/swap-execution architecture for ZodiTrade, ZodiXchange, ZodiChain
+
+- Added `docs/products/ZodiChain/SPEC.md`: a new, Foundation-depth product
+  spec covering multi-chain custodial/non-custodial wallet management,
+  WalletConnect integration, an NFT marketplace, crypto-to-crypto and
+  crypto-to-fiat swap functionality, and a multi-level crypto-denominated
+  affiliate/referral system layered on the inherited base engine's referral
+  program. Promoted from a previously-unwritten "future expansion" idea to
+  an active product on direct confirmation of two reference codebases on
+  the build server: `dash` (confirmed via `package.json` to be "Bicrypto"
+  v6.3.0, a Node.js/TypeScript pnpm monorepo — feature/UX reference only,
+  never ported) and `web3chainlink` (an ordinary Laravel application with a
+  `Modules/`-pattern directory, not yet fully audited — see the spec's
+  `## Open Questions`).
+- Corrected `docs/products/ZodiTrade/SPEC.md` and
+  `docs/products/ZodiXchange/SPEC.md`'s Architecture sections to explicitly
+  document that both products are fresh Laravel builds on the sanitized
+  qfsfountains base, and that `dash`/Bicrypto and `web3chainlink` are
+  feature/UX references only, never a base either product clones or ports
+  code from.
+- Added a dual trading/swap-execution-mode architecture decision to
+  ZodiTrade (external clearing-broker API vs. an internal admin-configured
+  pricing engine), ZodiXchange (external liquidity API vs. the internal
+  matching engine), and ZodiChain (external swap-liquidity API vs. an
+  internal admin-priced or AMM-style swap engine) — each following the
+  same pluggable-gateway abstraction pattern established in
+  `docs/standards/payment-gateways.md`, admin-selectable per
+  `docs/standards/admin-configuration-baseline.md`.
+- Updated `PRODUCT_CATALOG.md`: added the ZodiChain row (bringing the
+  catalog to 21 products) and noted the promotion rationale and the
+  `web3chainlink` open-verification item in the "Every product is
+  independent" section.
+
+### Changed — ZodiBank architecture correction: built on Pay Secure, not the qfsfountains base
+
+- Corrected `docs/products/ZodiBank/SPEC.md`'s Architecture (§11), Modules &
+  Submodules (§13), and Core Data Model (§14) sections. A direct filesystem
+  audit of the actual build server confirmed ZodiBank's real codebase
+  (`/home/script/public_html/zodibank/`) is **not** cloned from the
+  sanitized qfsfountains-sourced base codebase — it is built on "Pay
+  Secure," a separate, already-feature-complete commercial Laravel banking
+  product using `nwidart/laravel-modules`, with `Modules/Agent` and
+  `Modules/Merchant` already present, and Authorize.Net, Flutterwave,
+  CoinGate, and CinetPay already integrated.
+- Documented that Fixed Deposit Receipt (FDR), Deposit Pension Scheme
+  (DPS), account-number generation, and staff/branch management do not
+  exist anywhere in Pay Secure's codebase (confirmed by direct code
+  search) and must be built fresh as new `Modules/*` packages, modeled on
+  — but not inherited from — the equivalent qfsfountains base-codebase
+  tables documented in `docs/architecture/base-codebase-strategy.md`.
+- Added `docs/products/ZodiBank/FINCRA_INTEGRATION.md`: a new
+  admin-configurable Fincra integration module spec (Payins, Payouts,
+  Virtual Accounts, Identity Management), following the
+  `docs/standards/payment-gateways.md` and
+  `docs/standards/admin-configuration-baseline.md` patterns, with exact
+  Fincra API header/field names explicitly flagged as unverified pending
+  a live-docs check at implementation time.
+
 ### Added — build execution tracking and process gates
 
 - Added `docs/architecture/deployment-paths.md`: documents the
