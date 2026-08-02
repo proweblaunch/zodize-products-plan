@@ -244,11 +244,47 @@ codebase it's built from*:
      `nwidart/laravel-modules` using `include` (not `include_once`) to
      load each module's declared `files`. All three instances found and
      fixed; full details in `BUILD_STATE.md`.
-- **Known bugs, still open, not yet addressed in this pass**:
-  1. The cheque payment type has no due-date field.
-  2. Extra top spacing renders incorrectly in several non-English
-     languages.
-  3. An error occurs when creating a customer or supplier record.
+- **The 3 originally-reported known bugs are now fixed, each with a
+  confirmed, reproduced root cause (not a guess)** — full detail in
+  `BUILD_STATE.md`:
+  1. **Cheque due-date field**: `transaction_payments` had no
+     `cheque_due_date` column at all, and `TransactionUtil`'s
+     payment-array builders never included the field even where the UI
+     collected it. Added the column via migration, wired the field
+     through both the create and edit payment-line code paths (matching
+     the existing `paid_on` conversion pattern), and fixed 3 blade views
+     that referenced a translation key from a "Cheque" module that was
+     never actually an installed addon (confirmed unreliable in
+     `modules_statuses.json` — see above).
+  2. **Extra top spacing in several non-English languages**: the login/
+     register page's "Register" pill had a hardcoded fixed width sized
+     for the English word "Register"; longer translations (German
+     "Registrieren", Portuguese "Registration") wrapped to two lines
+     inside it, growing the absolutely-positioned header row taller than
+     the page content's hardcoded top-padding reserve. Fixed by sizing
+     the pill to its content instead of a fixed width.
+  3. **Error creating a customer/supplier record**: installing Superadmin
+     activated its package/subscription gate on all business CRUD, but no
+     package or subscription had been seeded for the deployment's single
+     business — every contact-creation attempt was silently short-
+     circuited into a "subscription expired" response instead of actually
+     creating the record. Since ZodiCore is single-tenant with no
+     Zodize-to-buyer billing relationship, fixed with a seeder that gives
+     the deployment's one business an unlimited, non-expiring package/
+     subscription, rather than touching Superadmin's own gating code. A
+     separate, smaller latent bug found during this investigation (CRM's
+     `creatContactPerson()` hashing a null password before checking
+     whether login was even requested) was also fixed.
+- **Architectural note for future Superadmin-gated features**: Superadmin's
+  `ModuleUtil::isSubscribed()`/`hasThePermissionInSubscription()` gate is a
+  multi-tenant SaaS mechanic (package selling, subscription expiry) that
+  is fundamentally in tension with ZodiCore's single-tenant deployment
+  model. The seeded unlimited package/subscription (see fix #3 above)
+  resolves this for every check gated purely on subscription *status*, but
+  any future feature that checks a package's specific *limits*
+  (`location_count`, `user_count`, `product_count`, `invoice_count`, etc.
+  — all set to `0`/unlimited on the seeded package) should be reviewed
+  against this same tension rather than assumed already handled.
 - **Public front pages return 404; auth and the back office otherwise
   function.** The static marketing/front pages need to be replaced with
   the shared Zodize design-system frontend per
