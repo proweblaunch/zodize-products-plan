@@ -94,7 +94,7 @@ established this rule.
 |---|---|---|---|---|
 | ZodiTrack | `extending-existing` | Confirmed on disk at `script/public_html/zoditrack/`: native procedural PHP (mysqli, page-routed `.php` files) freight/shipment-tracking site with public tracking-number lookup, customer portal, and a 33-file admin back office (shipments, branches, staff, customers, vendors, invoices, reports). **Domain mismatch found**: `docs/products/ZodiTrack/SPEC.md` was written describing an ITAM/enterprise-asset-tracking tool, which does not match — see the correction notice added to that spec's §0 | 2026-07-31 | Read every file under `admin/` in full, rewrite SPEC.md §1–§7 to describe the real freight-tracking business, then populate a real gap list |
 | ZodiBank | `extending-existing` | Confirmed on disk at `script/public_html/zodibank/`: Laravel + `nwidart/laravel-modules`, built on "Pay Secure," with `Modules/Agent` and `Modules/Merchant` already present, and Authorize.Net/Flutterwave/CoinGate/CinetPay gateways already in `composer.json`. Confirmed absent (via code search): FDR, DPS, account-number generation, staff/branch management. FINCRA_INTEGRATION.md spec added, several Fincra API specifics flagged as needing live-docs verification (WebFetch to docs.fincra.com returned HTTP 403 in this session) | 2026-07-31 | Build FDR/DPS/account-number/staff/branch modules fresh; verify Fincra's exact auth/webhook header names against live docs before implementing the integration; audit Pay Secure's own wallet/ledger against `docs/standards/wallet-system.md`'s invariants before building on it |
-| ZodiCore | `blocked` | **Re-verified, corrected again — see Flagged Items below.** The "22 addons already installed and active" finding from the prior pass was WRONG: `bootstrap/cache/*_module.php` and `modules_statuses.json` are stale artifacts — **no `Modules/` directory exists anywhere in the live app** (`find . -maxdepth 2 -iname Modules` returns nothing). Separately, a "corrected" instruction claiming these addons install by merging loose files into the main app root is ALSO contradicted: every one of the 20 addon packages (zipped or pre-extracted) is a **self-contained `Modules/<Name>/` package** with its own `composer.json`, `Config/`, `Console/` — the standard `nwidart/laravel-modules` shape, not scatter-merge files. Two conflicting premises, both checked directly, both wrong. Stopped before any merge per protocol rule 5 | 2026-07-31 | A human/product-owner decision is needed on how to proceed given both premises are contradicted by direct inspection — see Flagged Items for the specific evidence and the standard-nwidart-install option this audit recommends |
+| ZodiCore | `blocked` | **CRITICAL — do not install any addon until this is resolved.** Confirmed the addon-install method (standard `nwidart/laravel-modules`: extract as `Modules/<Name>/`) and initialized version control on the live codebase (`git init` at `/home/script/public_html/zodicore/`, baseline commit `460086a`, 2960 files). Before extracting anything, found direct evidence that the entire `modulesfiles/Ultimate POS Addons/` directory was sourced from a piracy/cracked-script redistributor ("nullcave.club") — see Flagged Items. Also found `modules_statuses.json` (22 names) does not match the 20 addon folders present at all: 18 unique module names exist across those 20 folders (two are duplicate-name variant pairs — `Accounting`/`Advance Accounting` both unzip to `Modules/Accounting/`; `CRM-With-SaaS`/`CRM-Without-SaaS` both unzip to `Modules/Crm/`), while 6 names in `modules_statuses.json` (`Ecommerce`, `FieldForce`, `InboxReport`, `CustomDashboard`, `ZatcaIntegrationKsa`, `Cheque`) have **no corresponding folder at all** — never purchased/downloaded for this deployment — and 2 folders (`InventoryManagement`, `Partners`) aren't in `modules_statuses.json`'s list at all. That JSON is confirmed unreliable as a scope document. Stopped before extracting any addon | 2026-08-02 | **Human decision required** on the piracy-provenance finding before any further ZodiCore addon work proceeds — see Flagged Items for full evidence and the two remaining lower-priority technical questions (Accounting/CRM variant choice, Superadmin's fit with the single-tenant architecture) that were queued behind this |
 | ZodiCapital | `extending-existing` | Confirmed on disk at `novavest/public_html/core/`: Laravel app, same `assets/`+`core/` structural split as the qfsfountains-lineage convention. Exact existing feature set (app/ contents, migrations) NOT yet audited — only the directory shape and Laravel identity are confirmed | 2026-07-31 | Audit `novavest/core/app/` and `novavest/core/database/migrations/` against `docs/products/ZodiCapital/SPEC.md` to produce a concrete gap list before building new modules — coordinate with ZodiYield's session, same codebase |
 | ZodiYield | `extending-existing` | Same novavest/core base as ZodiCapital (see above); same audit-not-yet-done caveat | 2026-07-31 | Same novavest audit as ZodiCapital — do not duplicate; check whether ZodiCapital's session already ran it first |
 | ZodiBusiness | `not-started` | Not begun — first in build order (`ROADMAP.md` #1), reference pipeline product | 2026-07-31 | Clone sanitized base to `/home/script/public_html/zodibusiness/`, run `product-genericization-checklist.md` |
@@ -125,6 +125,81 @@ meaningful (a full rewrite of the spec's Vision/Purpose/Personas sections,
 which currently describe the wrong business domain entirely).
 
 ## Flagged Items
+
+### 2026-08-02 — ZodiCore: `modulesfiles/Ultimate POS Addons/` sourced from a piracy redistributor ("nullcave.club"). CRITICAL, STOPPED before extracting anything.
+
+**Severity: supersedes every other ZodiCore item below. Do not extract,
+merge, or enable any of these 20 addon packages until this is resolved by
+a human decision.**
+
+While preparing to install the addons using the confirmed-correct
+`nwidart/laravel-modules` method (extract as `Modules/<Name>/`), direct
+inspection of the addon package files themselves found concrete evidence
+that they were sourced from a script-piracy redistribution site, not
+purchased legitimately:
+
+1. **An HTML redirect file to `https://nullcave.club/`** is present inside
+   at least two addon package folders as delivered:
+   `Asset-Management-V2.1/Asset-Management-V2.1/nullcave.club.html` and
+   `AiAssistance-Module-V2.0/nullcave.club.html`. Content (both identical):
+   a bare `<meta http-equiv="refresh" content="0; url=https://nullcave.club/">`
+   redirect page.
+2. **A second redirect file, `CMS-Module-V1.2/readme!.html`**, redirects to
+   the same `https://nullcave.club/` URL — a "readme" that is actually an
+   advertisement/redirect for the piracy site, not documentation.
+3. **The zip archive comment field itself says "NullCave.club" or
+   "NullCave.pro"** on at least 5 of the 17 zipped packages, visible via
+   `unzip -l` output before the file listing even starts: `Accounting.zip`
+   (base Accounting), `ProductCatalogue.zip`, `Connector.zip`, `Hms.zip`,
+   `Spreadsheet.zip`, and `AiAssistance.zip`. This is the tool that
+   originally repackaged/redistributed the zip stamping its own branding
+   into the archive metadata — a strong, standard signature of "nulled"
+   commercial script redistribution.
+4. A `grep -rli` sweep for `nullcave|nullphp|cracked|warez` across the
+   entire `modulesfiles/Ultimate POS Addons/` directory (including inside
+   zip contents via `unzip -p | strings`) found the marker in **at least
+   8 of the 20 addon package folders** — meaning this is not an isolated
+   file, it's characteristic of the batch as a whole.
+
+**This confirms — under a different specific domain name than originally
+reported — the licensing/piracy concern flagged as "unconfirmed" in
+`docs/products/ZodiCore/SPEC.md` §11 and this file's earlier flagged item
+below** (the original report named `nullphpscript.com`; this audit found
+`nullcave.club` instead — same category of concern, now confirmed with
+concrete evidence rather than an unconfirmed claim).
+
+**Why this stops the work, not just a note-and-continue:**
+
+- Legally: installing and building on top of software confirmed sourced
+  from a piracy redistributor is a genuine licensing risk for whatever
+  product ZodiCore becomes.
+- Security: "nulled"/cracked commercial PHP scripts are a well-known
+  vector for injected backdoors, license-bypass code that phones home, or
+  other tampering relative to the vendor's real release — the fact that no
+  additional suspicious strings were found in this pass's `grep`/`strings`
+  sweep does **not** rule out tampering that doesn't literally contain the
+  word "nullcave" (obfuscated code, unfamiliar outbound calls, etc.).
+- Scope: since the marker appears across at least 8 of 20 different addon
+  packages (different modules, different vendors' original release dates),
+  this strongly suggests the entire `modulesfiles/Ultimate POS Addons/`
+  directory came from one piracy redistributor's bundle, not that a few
+  individual files were tampered with — i.e. this is very likely true of
+  all 20, not just the 8 where a marker happened to survive.
+
+**What this pass did NOT do, given this finding**: no addon was extracted
+into `Modules/`, no `composer dump-autoload` or `module:enable` was run
+against any addon, and no addon-related file was committed. The **only**
+ZodiCore commit made in this pass is a clean baseline snapshot of the
+codebase exactly as it stood before this investigation (`git init` +
+initial commit, hash `460086a`, on the live codebase itself — a rollback
+point, not a merge).
+
+**Recommended next step, pending a human decision**: acquire these 22
+addon modules through Ultimate POS's legitimate purchase channel
+(`https://ultimatefosters.com`) before any of them are installed into a
+product ZodiCore is meant to become sellable, and treat the current
+`modulesfiles/` directory as unsuitable to build on until replaced with
+legitimately-sourced packages.
 
 ### 2026-08-02 — ZodiCore: addon install method — two conflicting premises, both contradicted by direct inspection. STOPPED before any merge.
 
