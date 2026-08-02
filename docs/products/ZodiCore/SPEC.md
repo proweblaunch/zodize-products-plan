@@ -226,21 +226,26 @@ codebase it's built from*:
   [frontend-backend-bridge.md](../../architecture/frontend-backend-bridge.md) —
   this is purely a public-page replacement; authenticated admin/POS routes
   are untouched.
-- **Open, non-blocking security item**: a licensing/provenance concern was
-  raised regarding whether the installed copy's documentation redirects to
-  a known script-piracy marker site. This audit could **not independently
-  confirm that specific claim** in this pass (a text search for the
-  reported marker string returned no matches in the areas searched, which
-  is not the same as confirming the claim is false — the search may not
-  have covered every relevant file, such as binary-adjacent vendor assets
-  or the `public/docs/images` directory, which was not inspected). This
-  MUST be tracked and verified directly — license authenticity confirmed,
-  and the codebase scanned for injected/backdoor code — before ZodiCore is
-  treated as a clean base for a sellable product, per
-  [`BUILD_STATE.md`](../../../BUILD_STATE.md)'s flagged items. This is
-  recorded as a **parallel, non-blocking task**: it does not block addon
-  conflict-resolution or feature-gap work, but it MUST be resolved before
-  GA.
+- **CONFIRMED, BLOCKING security item — the 22-addon set is confirmed
+  sourced from a piracy redistributor.** A licensing/provenance concern was
+  originally raised as unconfirmed (whether the base app's documentation
+  redirects to a script-piracy marker site). A follow-up audit, while
+  preparing to install the addon modules, found direct, concrete evidence:
+  an HTML redirect to `https://nullcave.club/` shipped inside at least two
+  addon package folders, a second such redirect disguised as a "readme"
+  file in a third, and the zip archive comment field itself reading
+  "NullCave.club"/"NullCave.pro" on at least five of the zipped packages —
+  present across at least 8 of the 20 addon folders. This is a **different
+  specific domain than originally reported, but the same class of
+  confirmed finding**: the addon set was not obtained through Ultimate
+  POS's legitimate purchase channel. See
+  [`BUILD_STATE.md`](../../../BUILD_STATE.md)'s flagged items for the full
+  evidence. **This blocks all 22 addons from being installed** until
+  legitimately-sourced replacements are obtained — it is no longer a
+  parallel, non-blocking task for the addon set specifically, though the
+  base Ultimate POS application itself (auth, admin, POS core) is a
+  separate question not covered by this specific finding and may still be
+  audited/used independently.
 
 There is no `tenant_id` anywhere in ZodiCore's schema, matching every other
 product. Where ZodiCore ships the optional plugin/marketplace system (per
