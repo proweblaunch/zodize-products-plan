@@ -370,6 +370,89 @@ confirm it matches
 [localization-i18n.md](../../standards/localization-i18n.md#multi-company--multi-branch-data-scoping)'s
 requirement).
 
+### 13.1 ERP Feature-Gap Analysis (verified against the live codebase)
+
+Audited directly against `/home/script/public_html/zodicore/`'s real
+`app/` and `Modules/` contents (controller/entity listings, not assumed
+from module names) now that the install record above is accurate.
+**Covered** (a complete ERP requirement already met by the base app plus
+the 18 installed modules — confirmed present, not just plausible):
+
+- **General ledger, chart of accounts, journal entries, reconciliation**:
+  `Modules/Accounting` (`ChartOfAccountController`, `JournalEntryController`,
+  `ReconcileController`).
+- **Budgeting**: `Modules/Accounting/Entities/Budget.php` +
+  `BudgetController` — a real budget feature already exists; this is
+  **not** a gap, despite budgeting commonly being assumed missing from POS-
+  derived ERPs.
+- **Procurement — requisition through purchase order**:
+  `app/Http/Controllers/PurchaseRequisitionController.php` and
+  `PurchaseOrderController.php` exist in the base app; this is a real,
+  already-present procurement workflow, not merely ad-hoc purchasing.
+- **Fixed assets**: `Modules/AssetManagement`.
+- **HR core (attendance, leave, payroll)**:
+  `Modules/Essentials` (`AttendanceController`, `EssentialsLeaveController`,
+  `PayrollController`).
+- **Manufacturing (BOM, recipes, production orders)**:
+  `Modules/Manufacturing` (`RecipeController`, `ProductionController`).
+- **CRM (leads, deals, contact persons)**: `Modules/Crm`.
+- **Project management**: `Modules/Project`.
+- **E-commerce channel sync**: `Modules/Woocommerce`.
+- **Third-party/API integration framework**: `Modules/Connector`.
+- **Multi-business/package administration**: `Modules/Superadmin` (see the
+  single-tenant architectural note in §11 regarding its subscription-gate
+  side effect, now handled by seeding).
+
+**Real gaps** (confirmed absent by direct code search, not merely
+unconfirmed):
+
+1. **No approval-workflow engine.** No staged, multi-step approval
+   routing exists anywhere in `app/` or any installed `Modules/*`
+   (searched for `approval`/`workflow` controllers — zero hits outside
+   Superadmin's own subscription-approval screen, which is unrelated).
+   Purchase orders, requisitions, and expenses are gated only by RBAC
+   permissions, not a configurable approval chain (e.g. "requisitions over
+   $X require a second approver"). A general-purpose ERP typically
+   expects this for procurement and expense control.
+2. **No recruitment/applicant-tracking or performance-appraisal
+   functionality.** `Modules/Essentials`'s HR scope stops at attendance/
+   leave/payroll — confirmed via its controller listing, no
+   `Recruitment`/`Appraisal`/`Performance` controller exists anywhere.
+3. **No true multi-warehouse/bin-location WMS depth.**
+   `Modules/InventoryManagement` is a single-controller module (only
+   `InventoryManagementController`) — it extends product/inventory
+   tracking modestly but does not add zone/bin-level warehouse management;
+   the base app's `business_locations` model covers branch/store-level
+   scoping, not internal warehouse logistics (put-away, pick-pack-ship,
+   cycle counting).
+4. **No demand forecasting/planning.** Confirmed absent by search
+   (`forecast` — zero hits in `app/` or any module).
+5. **No BI/custom-dashboard/scheduled-report layer.** Already flagged
+   above: `CustomDashboard` and `InboxReport` were never actually
+   installed (`modules_statuses.json` listed them, but no such addon
+   package exists in `modulesfiles/`) — reporting is limited to
+   `Modules/Accounting`'s own `ReportController` plus the base app's
+   built-in reports; there is no scheduled/emailed report delivery or a
+   configurable KPI dashboard layer.
+6. **No e-invoicing/regional tax-compliance module.** `ZatcaIntegrationKsa`
+   (Saudi e-invoicing) was likewise never actually installed — confirmed
+   absent, same as above. Any product built on this base for a market
+   requiring e-invoicing compliance needs this built fresh.
+7. **Multi-currency depth unconfirmed as complete.** `exchange_rate`/
+   currency-conversion code exists in 13 files (base app), but this pass
+   did not verify it reaches the depth
+   [localization-i18n.md](../../standards/localization-i18n.md#multi-currency-standard)
+   requires (per-transaction rate locking, multi-currency wallet
+   balances) — tracked as an open verification item, not a confirmed gap
+   either way.
+
+None of these gaps block ZodiCore's positioning as a **general-purpose
+back-office/ERP starter product** (per `PRODUCT_CATALOG.md`'s pitch) — a
+starter product reasonably ships without an approval-workflow engine or a
+full WMS. They are recorded here so a future buyer-facing "what's not
+included" list, or a decision to build one of these as a paid add-on, is
+grounded in a verified gap rather than a guess.
+
 ## 14. Database Design
 
 See [DATA_MODEL.md](./DATA_MODEL.md) for the full entity list, columns, and
