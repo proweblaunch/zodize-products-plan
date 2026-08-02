@@ -94,7 +94,7 @@ established this rule.
 |---|---|---|---|---|
 | ZodiTrack | `extending-existing` | Confirmed on disk at `script/public_html/zoditrack/`: native procedural PHP (mysqli, page-routed `.php` files) freight/shipment-tracking site with public tracking-number lookup, customer portal, and a 33-file admin back office (shipments, branches, staff, customers, vendors, invoices, reports). **Domain mismatch found**: `docs/products/ZodiTrack/SPEC.md` was written describing an ITAM/enterprise-asset-tracking tool, which does not match — see the correction notice added to that spec's §0 | 2026-07-31 | Read every file under `admin/` in full, rewrite SPEC.md §1–§7 to describe the real freight-tracking business, then populate a real gap list |
 | ZodiBank | `extending-existing` | Confirmed on disk at `script/public_html/zodibank/`: Laravel + `nwidart/laravel-modules`, built on "Pay Secure," with `Modules/Agent` and `Modules/Merchant` already present, and Authorize.Net/Flutterwave/CoinGate/CinetPay gateways already in `composer.json`. Confirmed absent (via code search): FDR, DPS, account-number generation, staff/branch management. FINCRA_INTEGRATION.md spec added, several Fincra API specifics flagged as needing live-docs verification (WebFetch to docs.fincra.com returned HTTP 403 in this session) | 2026-07-31 | Build FDR/DPS/account-number/staff/branch modules fresh; verify Fincra's exact auth/webhook header names against live docs before implementing the integration; audit Pay Secure's own wallet/ledger against `docs/standards/wallet-system.md`'s invariants before building on it |
-| ZodiCore | `extending-existing` | Confirmed on disk at `script/public_html/zodicore/`: Laravel + `nwidart/laravel-modules`, built on "Ultimate POS," with 22 addon modules **already installed and active** (confirmed via `modules_statuses.json` all-`true` plus `bootstrap/cache/*_module.php` service-provider caches for every one) — NOT merely staged as zips awaiting install, correcting the original task premise. 3 known bugs open (cheque due-date field, language-specific spacing bug, customer/supplier creation error) — not yet verified fixed. Public front pages confirmed 404; auth/admin routes function | 2026-07-31 | Reconcile SPEC.md §1–§10 against the real Ultimate POS capability (far more than "task tracker + generic records"); resolve addon conflicts; audit for ERP gaps (procurement, BI) beyond the 22 modules; fix the 3 bugs; replace front pages per `docs/standards/frontend-standard.md`; run the parallel license/backdoor security check (see Flagged Items) |
+| ZodiCore | `blocked` | **Re-verified, corrected again — see Flagged Items below.** The "22 addons already installed and active" finding from the prior pass was WRONG: `bootstrap/cache/*_module.php` and `modules_statuses.json` are stale artifacts — **no `Modules/` directory exists anywhere in the live app** (`find . -maxdepth 2 -iname Modules` returns nothing). Separately, a "corrected" instruction claiming these addons install by merging loose files into the main app root is ALSO contradicted: every one of the 20 addon packages (zipped or pre-extracted) is a **self-contained `Modules/<Name>/` package** with its own `composer.json`, `Config/`, `Console/` — the standard `nwidart/laravel-modules` shape, not scatter-merge files. Two conflicting premises, both checked directly, both wrong. Stopped before any merge per protocol rule 5 | 2026-07-31 | A human/product-owner decision is needed on how to proceed given both premises are contradicted by direct inspection — see Flagged Items for the specific evidence and the standard-nwidart-install option this audit recommends |
 | ZodiCapital | `extending-existing` | Confirmed on disk at `novavest/public_html/core/`: Laravel app, same `assets/`+`core/` structural split as the qfsfountains-lineage convention. Exact existing feature set (app/ contents, migrations) NOT yet audited — only the directory shape and Laravel identity are confirmed | 2026-07-31 | Audit `novavest/core/app/` and `novavest/core/database/migrations/` against `docs/products/ZodiCapital/SPEC.md` to produce a concrete gap list before building new modules — coordinate with ZodiYield's session, same codebase |
 | ZodiYield | `extending-existing` | Same novavest/core base as ZodiCapital (see above); same audit-not-yet-done caveat | 2026-07-31 | Same novavest audit as ZodiCapital — do not duplicate; check whether ZodiCapital's session already ran it first |
 | ZodiBusiness | `not-started` | Not begun — first in build order (`ROADMAP.md` #1), reference pipeline product | 2026-07-31 | Clone sanitized base to `/home/script/public_html/zodibusiness/`, run `product-genericization-checklist.md` |
@@ -125,6 +125,80 @@ meaningful (a full rewrite of the spec's Vision/Purpose/Personas sections,
 which currently describe the wrong business domain entirely).
 
 ## Flagged Items
+
+### 2026-08-02 — ZodiCore: addon install method — two conflicting premises, both contradicted by direct inspection. STOPPED before any merge.
+
+**Severity: blocks Step 2 (merging addons) until a human decides how to
+proceed.** No files were extracted or merged into the live app; this is a
+pure investigation finding.
+
+**Premise A** (this ledger's own prior entry, from PR #4): the 22 addons
+were already installed and active, evidenced by `modules_statuses.json`
+having all 22 set `true` and `bootstrap/cache/*_module.php` cache files
+existing for each one.
+
+**Premise B** (a later correction, delivered as an instruction in this
+session): the addon zips are meant to be extracted directly into the main
+app root (`/home/script/public_html/zodicore/` itself) — adding missing
+files and updating specific existing files — NOT registered as
+self-contained `Modules/<Name>/` packages.
+
+**Both are contradicted by direct inspection in this pass:**
+
+1. **No `Modules/` directory exists anywhere in the live app.**
+   `find . -maxdepth 2 -iname Modules -type d` from
+   `script/public_html/zodicore/` returns nothing. `ls -la` at the app root
+   shows only `modules_statuses.json` and `modulesfiles/` — no `Modules/`.
+   This directly contradicts Premise A: the cache files and status JSON are
+   evidently stale artifacts (most plausibly baked into Ultimate POS's own
+   demo/marketing build, which vendors commonly ship with all
+   modules "enabled" for screenshot purposes) that do not reflect this
+   deployment's real state. **None of the 22 addons are actually merged
+   into this live codebase in any form.**
+2. **Every one of the 20 addon packages is a self-contained
+   `nwidart/laravel-modules`-shaped package, not loose files for a
+   root-directory merge.** Confirmed via `unzip -l` on every zipped addon
+   (17 of 20) and direct directory listing of the 3 pre-extracted ones
+   (`Asset-Management-V2.1`, `Gym-V0.5`, `Partners-v2.0`): every package's
+   entire content sits under one top-level folder matching the module name
+   (e.g. `Accounting/composer.json`, `Accounting/Config/`,
+   `Accounting/Console/` — same shape for all 20: Accounting, Advance
+   Accounting, AiAssistance, Cms, Crm ×2, ProductCatalogue, Essentials,
+   Hms, InventoryManagement, Manufacturing, Project, Repair, Spreadsheet,
+   Superadmin, Woocommerce, Connector, plus the three pre-extracted ones).
+   This is the standard `nwidart/laravel-modules` per-module package shape
+   (own `composer.json`, `Config/`, `Console/`), meant to be extracted as
+   `Modules/<Name>/` — the same pattern already confirmed in
+   `docs/architecture/base-codebase-strategy.md` for the qfsfountains base
+   and in ZodiBank's Pay Secure (`Modules/Agent`, `Modules/Merchant`).
+   Treating these as "add missing files, update specific existing files in
+   the app root" per Premise B would mean manually decomposing 20
+   well-formed, self-contained Laravel packages into a scatter of files
+   merged into `app/`/`resources/`/`database/` — which is not what their
+   own structure suggests, is not how `nwidart/laravel-modules` addons are
+   normally installed for this class of product, and risks breaking
+   autoloading/namespacing for no confirmed benefit.
+3. `.gitignore` at the app root does not exclude `/Modules` — so there is
+   no configuration reason a `Modules/` directory would be legitimately
+   present but hidden from listing/search; it is simply not there.
+4. A "Getting Started" PDF ships alongside each addon zip (e.g.
+   `Accounting-Module-For-UltimatePOS-V0.8.5/Getting Started - Accounting
+   Module for UltimatePOS.pdf`) that would very likely state the exact
+   install method definitively — `pdftotext` was not available in this
+   session's terminal to extract its text, so this could not be directly
+   confirmed, but the zip structure alone is unambiguous enough to flag
+   this without it.
+
+**What this pass recommends, pending explicit confirmation**: the standard
+`nwidart/laravel-modules` install method — extract each addon's `<Name>/`
+folder as `Modules/<Name>/`, run `composer dump-autoload`, then
+`php artisan module:enable <Name>` (or the equivalent migrate/seed steps),
+one module at a time, verifying no conflicts before each commit — matches
+the confirmed zip structure and the same pattern already used elsewhere in
+this handbook. This is a **change from both prior premises**, so it is
+recorded here rather than acted on unilaterally. A human/product-owner
+decision is needed before any addon is actually extracted into the live
+codebase.
 
 ### 2026-07-31 — ZodiCore: unconfirmed license/piracy-marker claim (parallel, non-blocking)
 
