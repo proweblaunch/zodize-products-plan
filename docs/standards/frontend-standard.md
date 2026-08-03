@@ -15,7 +15,9 @@ use **one shared frontend shell**, not a per-product reimplementation. That
 shell is the codebase at `/home/zodize/public_html` on the build server: a
 Laravel + Blade application carrying the design tokens
 ([`../design-system/design-tokens.md`](../design-system/design-tokens.md)),
-Tailwind v4 configuration, and a reusable `x-zodize.*` Blade component
+Bootstrap 5 configuration (Zodize theme layered on top per
+[`../development/coding-standards-laravel-frontend.md`](../development/coding-standards-laravel-frontend.md)),
+and a reusable `x-zodize.*` Blade component
 library. A product's own build clones this shell alongside the sanitized
 qfsfountains base (or, for products on an alternate base per
 [`base-codebase-strategy.md`](../architecture/base-codebase-strategy.md)'s
@@ -62,7 +64,8 @@ not by assuming it already exists.
 ## How a product adopts this shell
 
 1. Clone `/home/zodize/public_html`'s `resources/`, `public/`, `routes/`
-   (the marketing-facing ones), and `config/` (Tailwind/Vite config)
+   (the marketing-facing ones), and `config/` (Bootstrap Sass/Vite asset
+   config)
    alongside that product's own backend base (qfsfountains-derived, Pay
    Secure, Ultimate POS, or novavest, per that product's own
    [`SPEC.md`](../products/)).

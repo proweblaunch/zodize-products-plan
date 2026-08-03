@@ -273,9 +273,9 @@ same contract.
 
 ## 12. Technology
 
-Laravel (PHP) + Vue per
+Laravel (PHP) + Blade + Bootstrap 5 + jQuery per
 [coding-standards-php-laravel.md](../../development/coding-standards-php-laravel.md)
-and [coding-standards-vue.md](../../development/coding-standards-vue.md)
+and [coding-standards-laravel-frontend.md](../../development/coding-standards-laravel-frontend.md)
 for the account, custody-reconciliation, surveillance, and admin surfaces;
 the matching engine itself is a dedicated low-latency service (in-memory
 order book per symbol, persisted asynchronously) integrated via the

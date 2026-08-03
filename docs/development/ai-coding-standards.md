@@ -35,7 +35,7 @@ silently guessing and moving on.
 1. Read the relevant handbook standards and product spec section before
    writing code.
 2. Follow [coding-standards-php-laravel.md](./coding-standards-php-laravel.md)
-   / [coding-standards-vue.md](./coding-standards-vue.md) exactly — an
+   / [coding-standards-laravel-frontend.md](./coding-standards-laravel-frontend.md) exactly — an
    agent's stylistic preference never overrides a written standard.
 3. Write the tests required by
    [testing-standards.md](./testing-standards.md#non-negotiable-test-cases)

@@ -266,9 +266,9 @@ other's SPEC.md rather than re-running the same filesystem audit twice.
 
 ## 12. Technology
 
-Laravel (PHP) + Vue per
+Laravel (PHP) + Blade + Bootstrap 5 + jQuery per
 [coding-standards-php-laravel.md](../../development/coding-standards-php-laravel.md)
-and [coding-standards-vue.md](../../development/coding-standards-vue.md);
+and [coding-standards-laravel-frontend.md](../../development/coding-standards-laravel-frontend.md);
 PostgreSQL for loan/payment/amortization records + Redis for delinquency-
 bucket and collections-queue caching per
 [database-standards.md](../../development/database-standards.md);

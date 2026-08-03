@@ -82,6 +82,41 @@
      to any backend-only check). Backend verification and live-site
      verification are both required, not one or the other.
 
+## Stack correction (this session)
+
+The blueprint previously specified Vue (`docs/development/coding-standards-vue.md`,
+referenced from `docs/architecture/overview.md` and
+`docs/standards/frontend-standard.md`) as part of the frontend stack. This
+was wrong and has been corrected: the real, confirmed standard — verified
+directly against the qfsfountains base, Pay Secure (ZodiBank), and Ultimate
+POS (ZodiCore) codebases on the build server — is the classic ViserLab
+pattern: **Laravel (latest, PHP 8.x) + MySQL/MariaDB + Blade templates +
+Bootstrap 5 + jQuery + Font Awesome + Composer + Node/NPM for asset
+compilation + Apache**. `coding-standards-vue.md` is retired; see
+[`docs/development/coding-standards-laravel-frontend.md`](./docs/development/coding-standards-laravel-frontend.md)
+for the corrected standard. Zodize's own design tokens/theme (colors,
+typography from zodize.com) apply **on top of** this stack as a styling
+layer — Bootstrap 5 + Zodize theme, not a framework change.
+
+**Implication for ZodiCore and ZodiBank**: both are already built on
+Bootstrap-based admin panels (Ultimate POS and Pay Secure respectively).
+Their remaining "Zodize theme" work is a **styling pass** on their existing
+Bootstrap structure (CSS custom properties, Zodize color/typography tokens,
+component skinning) — not a rebuild, and not a migration to any other
+frontend framework.
+
+## Working method (this session)
+
+For every remaining product, before writing code: write a short milestone
+plan into that product's `SPEC.md` (concrete features broken into buildable
+milestones, in build order), then execute the milestones directly,
+committing as each completes. This replaces exhaustive multi-pass auditing
+as the default for routine build work. Audit-first stays appropriate for
+provenance/security concerns (ZodiCore's addon-piracy issue) or genuinely
+undocumented live systems (ZodiTrack's domain mismatch) — not for building a
+feature that doesn't already exist and isn't inherited from a legally
+uncertain source.
+
 ## Environment access
 
 **Resolved.** An earlier version of this ledger recorded that
