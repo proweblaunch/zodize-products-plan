@@ -609,28 +609,91 @@ before go-live.
 - Automated benchmark comparison against third-party vintage-year
   performance data feeds.
 
-## Open Questions
+## Open Questions (audit closed — see §11.1)
 
-- **Novavest's exact existing feature set needs a deeper audit.** The
-  filesystem audit backing §11 confirmed `/home/novavest/public_html/core/`
-  is a Laravel application with the standard `assets/` + `core/` structural
-  split, but it did not inspect `novavest/core/app/` or
-  `novavest/core/database/migrations/` in depth. A follow-up session MUST
-  audit both against this SPEC.md's requirements (§9 Functional
-  Requirements, §14 Core Data Model) — fund structures, capital calls,
-  distributions, NAV calculation, investor portal, RBAC/auth, KYC, and
-  wallet/ledger — and produce a concrete gap list (requirement → present/
-  absent/partial in novavest) before any new migration or module is built.
-  Until that audit runs, treat every "novavest already has X" or "ZodiCapital
-  must build Y fresh" statement in this document as unverified against the
-  real codebase, not as a completed audit result.
+The novavest audit called for below is now complete; see §11.1 for the gap
+list and milestone plan. Kept for history:
+
 - **Overlap with ZodiYield's own novavest audit.** Because
   [ZodiYield](../ZodiYield/SPEC.md) shares the same novavest/core
-  foundation, whichever session performs the novavest audit first SHOULD
-  record shared findings (RBAC, KYC, wallet/ledger, or any other
-  cross-cutting infrastructure novavest already provides) somewhere both
-  specs can reference, so the second product's audit doesn't repeat work
-  already done for the first.
+  foundation, the audit was run once and shared between both specs — see
+  §11.1 in both files, which are intentionally near-identical on the shared
+  infrastructure findings and diverge only on domain-specific gaps/modules.
+
+## 11.1 Novavest audit findings and milestone plan (this session)
+
+**Audit method**: direct filesystem inspection of
+`/home/novavest/public_html/core/` (composer.json, `app/Models/`,
+`routes/admin.php`, `resources/views/admin/`) plus a live `SHOW COLUMNS`
+query against every table in the `novavest` MySQL database (36 tables,
+confirmed via `information_schema`) — not a code-only guess.
+
+**What novavest/core actually is**: a single-admin, single-tenant
+retail investment/staking platform (the "ViserLab" HYIP-style script
+family — model names and table names match `Invest`, `Pool`, `Staking`,
+`ScheduleInvest`, `Plan`, `Referral`, `Deposit`, `Withdrawal`, `Gateway`).
+Confirmed present: `users`/`admins` auth, KYC (`KycController`,
+`KycMiddleware`, KYC fields on `users`), a deposit/withdrawal
+wallet-ledger (`deposits`, `withdrawals`, `transactions`, `gateways`,
+`gateway_currencies`, `withdraw_methods`), investment plans with
+fixed/compound interest (`plans`, `invests` — `interest_type`,
+`compound_interest`, `repeat_time`, `capital_back` columns), referrals
+(`referrals`, `user_rankings`), a CMS/page builder (`pages`, `frontends`,
+`languages`), cron/scheduled jobs (`cron_jobs`, `cron_schedules`,
+`cron_job_logs`), and notifications (`notification_templates`,
+`notification_logs`, `admin_notifications`). Admin panel is a standard
+Bootstrap/jQuery/DataTables Laravel admin (`routes/admin.php` +
+`resources/views/admin/`, data-driven sidebar via `sidenav.json`) —
+consistent with the corrected stack standard (see `BUILD_STATE.md`'s
+stack-correction note).
+
+**Confirmed absent** (checked directly, not inferred): **no `Role`/
+`Permission` models or tables at all** — `admins` is a single flat table
+with no role column, no branch/team scoping (same single-admin-account
+pattern ZodiBank's Pay Secure had before RBAC was seeded — but here there
+isn't even an empty RBAC scaffold to seed, it doesn't exist). **No fund,
+LP/GP, capital-call, distribution, NAV, or waterfall tables of any kind.**
+`invests`/`plans` model a retail user investing their own wallet balance
+into a fixed/compound-interest plan and drawing it back out — structurally
+adjacent to a NAV/return concept but with no fund-of-multiple-LPs, no
+pro-rata capital-call mechanic, no distribution waterfall, and no
+GP/LP-distinct entities (every `invests` row belongs to one `user_id`
+investing their own money, not a fund manager allocating pooled capital
+across investors). This is a genuine, large, confirmed gap — not a
+naming difference to reconcile.
+
+**Milestone plan** (concrete, build order, commit after each):
+
+1. **RBAC foundation** — `roles`/`permissions`/`role_has_permissions`
+   tables + `Role`/`Permission` models, `admins.role_id` column, admin
+   management UI updated with a Role field. This is a prerequisite for
+   §18's Fund Controller/IR/GP/Compliance/LP roles and is shared,
+   non-duplicated infrastructure for ZodiYield too — build once here,
+   ZodiYield reuses it.
+2. **Fund Structures module** — `funds`, `investors`, `commitments` tables/
+   models/migrations; admin CRUD (controller, routes under
+   `admin.funds.*`, Blade views matching the existing `plan`/`pool`
+   controller pattern, sidenav entry). No LP portal yet — admin-managed
+   only in this milestone.
+3. **Capital Accounts + Capital Calls** — `capital_accounts`,
+   `capital_calls`, `capital_call_allocations`; pro-rata calculation
+   service; admin approval workflow (initiator ≠ approver per §19).
+4. **Distributions** — `distributions`, `distribution_allocations`;
+   configurable waterfall (`waterfall_config_json` on `funds`, per §14);
+   admin approval workflow.
+5. **NAV & Performance** — `nav_valuations`, `performance_snapshots`; IRR/
+   MOIC/DPI/TVPI calculation service with a regression fixture test
+   (§28).
+6. **Investor Portal** — LP-scoped auth (reuses `users` + new
+   `investor_id` linkage or a dedicated LP guard), statements/documents/
+   performance view, cross-LP isolation test (§28/§30).
+7. **Subscription & E-Signature, Compliance** — accreditation
+   verification workflow, subscription document templates, e-signature
+   provider integration (§22).
+
+Milestone 1 (RBAC) and Milestone 2 (Fund Structures) are the concrete
+target for this session's build pass; later milestones are queued in
+`BUILD_STATE.md`'s ledger for follow-up sessions.
 
 ## Roadmap (spec depth)
 

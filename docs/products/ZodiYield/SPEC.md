@@ -600,28 +600,81 @@ before go-live.
 - Machine-learning-assisted collections next-best-action recommendations
   beyond the current prioritization assistant.
 
-## Open Questions
+## Open Questions (audit closed — see §11.1)
 
-- **Novavest's exact existing feature set needs a deeper audit.** The
-  filesystem audit backing §11 confirmed `/home/novavest/public_html/core/`
-  is a Laravel application with the standard `assets/` + `core/` structural
-  split, but it did not inspect `novavest/core/app/` or
-  `novavest/core/database/migrations/` in depth. A follow-up session MUST
-  audit both against this SPEC.md's requirements (§9 Functional
-  Requirements, §14 Core Data Model) — origination, underwriting,
-  amortization/servicing, collections, disclosures, RBAC/auth, KYC, and
-  wallet/ledger — and produce a concrete gap list (requirement → present/
-  absent/partial in novavest) before any new migration or module is built.
-  Until that audit runs, treat every "novavest already has X" or "ZodiYield
-  must build Y fresh" statement in this document as unverified against the
-  real codebase, not as a completed audit result.
+The novavest audit called for below is now complete; see §11.1 for the gap
+list and milestone plan. Kept for history:
+
 - **Overlap with ZodiCapital's own novavest audit.** Because
   [ZodiCapital](../ZodiCapital/SPEC.md) shares the same novavest/core
-  foundation, whichever session performs the novavest audit first SHOULD
-  record shared findings (RBAC, KYC, wallet/ledger, or any other
-  cross-cutting infrastructure novavest already provides) somewhere both
-  specs can reference, so the second product's audit doesn't repeat work
-  already done for the first.
+  foundation, the audit was run once and shared between both specs — see
+  §11.1 in both files, which are intentionally near-identical on the shared
+  infrastructure findings and diverge only on domain-specific gaps/modules.
+
+## 11.1 Novavest audit findings and milestone plan (this session)
+
+**Audit method**: direct filesystem inspection of
+`/home/novavest/public_html/core/` (composer.json, `app/Models/`,
+`routes/admin.php`, `resources/views/admin/`) plus a live `SHOW COLUMNS`
+query against every table in the `novavest` MySQL database (36 tables) —
+not a code-only guess. See
+[ZodiCapital's SPEC.md §11.1](../ZodiCapital/SPEC.md#111-novavest-audit-findings-and-milestone-plan-this-session)
+for the full shared-infrastructure write-up (identical findings, not
+repeated verbatim here); this section covers only what's specific to
+ZodiYield's lending domain.
+
+**What's confirmed present** (shared with ZodiCapital): `users`/`admins`
+auth, KYC (`KycController`, `KycMiddleware`), a deposit/withdrawal
+wallet-ledger (`deposits`, `withdrawals`, `transactions`, `gateways`,
+`withdraw_methods`), a CMS/cron/notification layer, and a standard
+Bootstrap/jQuery/DataTables admin panel. `plans`/`invests` (fixed or
+compound interest, configurable term, `repeat_time`, `capital_back`) are
+the closest existing analog to a "yield product" — a user deposits into a
+plan and earns a defined return — but this is the platform's own money
+returning to the same user, not one party lending to another.
+
+**Confirmed absent**: **no `Role`/`Permission` RBAC at all** (see
+ZodiCapital §11.1 — shared gap, build once). **No loan/borrower/
+origination/underwriting/servicing/collections tables of any kind.**
+There is no `borrower` concept distinct from an investor, no principal-
+plus-interest amortization schedule, no disbursement-to-a-third-party
+flow, no delinquency/collections tracking, and no credit-bureau/
+underwriting integration point. `invests`/`plans` cannot be relabeled into
+a loan product — a loan requires two distinct parties (lender capital,
+borrower principal+interest owed back) and an amortization schedule,
+neither of which the existing `invests` self-referential deposit/return
+model has. This is a genuine, confirmed gap, not a renaming exercise.
+
+**Milestone plan** (concrete, build order, commit after each):
+
+1. **RBAC foundation** — shared with ZodiCapital §11.1 milestone 1; build
+   once, reuse. If ZodiCapital's session builds it first, ZodiYield's
+   session extends the same `roles`/`permissions` tables with its own
+   lending-specific roles (§18) rather than duplicating the RBAC tables.
+2. **Loan Products + Borrowers module** — `loan_products` (rate type,
+   term, fee schedule), `borrowers` (distinct from `investors`/`users`
+   where a KYC'd user opts into a borrower profile); admin CRUD matching
+   the existing `plan` controller pattern.
+3. **Origination** — `loan_applications` intake flow, product selection,
+   disclosure generation (APR/finance-charge calculation per §9).
+4. **Underwriting** — manual review queue first (admin-side approve/
+   decline with reason), `UnderwritingProviderContract` stub for a future
+   credit-bureau integration (§22) — do not block the milestone on a real
+   bureau integration.
+5. **Servicing** — `loans`, `loan_schedule` (amortization engine:
+   principal/interest split per period), disbursement (reuses the
+   existing wallet/gateway withdrawal-method infrastructure), payment
+   processing against the schedule.
+6. **Collections** — delinquency-bucket calculation (scheduled job, per
+   `cron_jobs`/`cron_schedules` convention already in novavest), case
+   queue, agent assignment.
+7. **Borrower Portal** — statement access, payment method management,
+   payoff request, reusing the existing `users` auth guard with a
+   borrower-scoped view.
+
+Milestone 1 (RBAC, shared) and Milestone 2 (Loan Products + Borrowers) are
+the concrete target for this session's build pass; later milestones are
+queued in `BUILD_STATE.md`'s ledger for follow-up sessions.
 
 ## Roadmap (spec depth)
 
