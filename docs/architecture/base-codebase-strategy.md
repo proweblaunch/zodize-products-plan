@@ -150,6 +150,60 @@ modules consume the inherited engine's services (wallet, notifications,
 RBAC, settings) the same way any other application code does — they never
 fork or duplicate an inherited controller/model to add domain behavior.
 
+## Mandatory isolation before touching any live reference codebase
+
+**This rule is universal and non-negotiable, for every product, present or
+future — not limited to qfsfountains.** Whenever a product is built
+starting from an existing **live, running** reference codebase — the
+sanitized qfsfountains base, Pay Secure (ZodiBank), Ultimate POS
+(ZodiCore), novavest (ZodiCapital/ZodiYield), or any future live site used
+as a foundation or reference — the live reference site itself is **never**
+edited, migrated against, or logged into for anything beyond read-only
+inspection. This was added after a real incident: an early build pass on
+ZodiCapital/ZodiYield ran migrations and file edits directly against the
+live `novavest.org` codebase and database before this rule existed — see
+`BUILD_STATE.md`'s Flagged Items for the full accounting. Rule 6 in
+`BUILD_STATE.md` already required this for `Live — Extend Only` products
+(ZodiTrack); this section generalizes it to *any* live reference codebase,
+including internal ones like novavest that aren't formally `Live — Extend
+Only` in the catalog sense.
+
+The mandatory first step, before any modification:
+
+1. **Copy first.** Copy the reference codebase into the product's own
+   isolated subfolder at `/home/script/public_html/<product-slug>/`
+   (excluding `vendor/`/`node_modules/`/`.git` — reinstall those fresh in
+   the copy rather than carrying them over). The original reference site's
+   folder is read-only from this point forward.
+2. **Isolated database, always.** Create a new, separate MySQL database
+   for the product's copy, granted to the `script` DB user. Export the
+   reference codebase's schema and non-live reference/config data (i18n
+   strings, gateway/plan configuration, seed lookup tables) — never live
+   user accounts, financial transactions, or other real business data —
+   and import that clean structure into the new database.
+3. **Point the copy's runtime `.env` at its own isolated database**,
+   clearing out any connection values copied from the reference site.
+   Some inherited codebases load their real `.env` from a non-obvious path
+   (e.g. novavest's `bootstrap/app.php` calls
+   `$app->loadEnvironmentFrom('vendor/psr/log/.env')` rather than the
+   project-root `.env`) — locate and update the actual file the
+   application reads, not just the conventional root `.env`, and verify by
+   booting the app rather than assuming the root file is authoritative.
+4. **Rebuild feature work as fresh migrations/seeders inside the isolated
+   copy**, never by copying live data across, and create a fresh
+   admin/owner account independently rather than reusing the reference
+   site's live credentials.
+5. **Confirm the isolated copy boots and its core admin flow works live**,
+   inside its own folder and database, before any further feature work
+   proceeds. If the reference codebase turns out to be a licensed
+   commercial script with an activation/license-check mechanism (as
+   novavest's ViserLab/HYIPLAB base was found to have — see
+   `BUILD_STATE.md`), do **not** attempt to bypass, patch around, or copy
+   activation state from the licensed reference installation to make the
+   isolated copy pass that check — stop and flag it as a licensing/
+   provenance concern requiring a human decision, the same as any other
+   piracy/licensing finding in this handbook.
+
 ## Related standards
 
 - [`overview.md`](./overview.md)
