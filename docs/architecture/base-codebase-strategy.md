@@ -5,17 +5,90 @@
 > [`overview.md`](./overview.md#one-base-codebase-twenty-independent-products)
 > and [`single-tenant-deployment-model.md`](./single-tenant-deployment-model.md).
 
-## Source of the base codebase
+## Source of the base codebase: ZodiAdmin (current, as of 2026-08-03)
 
-Every Zodize product's back office starts as a clone of one audited,
-production Laravel application (internally referred to during audit as
-"ViserBank/ViserLab Core Engine v3.0", sourced from
-`/home/qfsfountains/public_html`). This is not a template written for this
-handbook — it is a working banking application with a complete admin back
-office already covering settings, payment gateways, wallet/ledger, KYC,
-referrals, plans, i18n, and CMS. Treat it as the inherited engine every
-product's back office is cloned and adapted from, never rebuilt from
-scratch.
+**novavest and qfsfountains are retired as bases, permanently.** Neither is
+referenced, cloned, or touched for any future product work. This section
+was rewritten when that decision was made; see the "Retired predecessors"
+subsection below for what came before, kept for history.
+
+Every Zodize product's back office now starts as a clone of **ZodiAdmin**,
+Zodize's own base codebase, which lives at
+`/home/script/public_html/zodicapital/` (built from an isolated,
+de-licensed, rebranded copy of the novavest/HYIPLAB-lineage codebase — see
+`BUILD_STATE.md`'s 2026-08-03 entries for the full history of how it got
+there). ZodiAdmin **is not a separate template folder** — the ZodiCapital
+deployment itself, once fully verified, doubles as the canonical base every
+other product clones from. There is no third, abstracted "base-only"
+directory to keep in sync; cloning ZodiAdmin *is* cloning ZodiCapital's
+codebase before that product's own domain modules are layered on.
+
+ZodiAdmin ships with:
+
+- A complete admin back office: settings, payment gateways, wallet/ledger,
+  KYC, referrals, an investment/plan pattern, i18n, and CMS — the same
+  inherited-engine feature set the old qfsfountains base provided.
+- **RBAC** (`roles`/`permissions`/`role_has_permissions`, admin Roles +
+  Staff management UI) — built during ZodiCapital/ZodiYield's early
+  milestones, now part of the shared base every product inherits, not
+  something each product re-builds.
+- **No license/activation gate of any kind.** ZodiAdmin's predecessor had
+  a three-layer ViserLab/HYIPLAB license-activation mechanism (a global
+  controller-constructor check, a route-middleware wrap, and a per-login
+  call-home); all three layers were traced and cleanly removed, not
+  bypassed or replaced with a stub. **Licensing is intentionally absent
+  from ZodiAdmin and every product cloned from it, until a dedicated final
+  pass adds Zodize's own licensing system (`license.zodize.com`) once the
+  full product lineup is built.** Do not add any license check, gate, or
+  placeholder to any product before that pass — see
+  `BUILD_STATE.md` for the explicit instruction this follows.
+- **Zodize branding and theme already applied**: `ZodiAdmin` as the admin
+  panel name, Zodize brand indigo (`#6366F1`) + Inter typography layered
+  over the existing Bootstrap 5 structure via
+  `assets/admin/css/zodize-theme.css` (loaded after the base theme's own
+  CSS — a styling layer, not a rebuild), and a `zodize` front-facing
+  template (see "Template system" below).
+
+### How to clone ZodiAdmin for a new product
+
+Same isolation discipline as any live-reference-derived product (see
+"Mandatory isolation before touching any live reference codebase" below —
+this now applies to ZodiAdmin itself as the reference, not just to
+novavest):
+
+1. Copy `/home/script/public_html/zodicapital/` into the new product's own
+   folder at `/home/script/public_html/<product-slug>/`, excluding
+   `vendor/` and `.git` (reinstall/re-init fresh in the copy).
+2. Create a new, separate MySQL database under the `script` DB user;
+   export ZodiAdmin's schema + non-live reference/seed data (RBAC roles/
+   permissions, general settings, gateways, languages — never another
+   product's live users/transactions) and import into the new database.
+3. Point the copy's `.env` (the real, root-level `.env` — ZodiAdmin no
+   longer loads from a hidden path) at the new isolated database.
+4. `composer install`, fresh `APP_KEY`, reconcile the `migrations` table
+   the same way documented in `BUILD_STATE.md`'s isolation entries, and
+   seed a fresh admin account independently.
+5. Layer the new product's own domain modules on top (see "Layering a
+   product's domain modules" below) and, if the product needs a distinct
+   look, add a new template under `resources/views/templates/<product>/`
+   following the `zodize` template's pattern rather than editing the
+   shared one in place.
+6. Verify live (rule 8) before starting feature work.
+
+### Retired predecessors (history only — do not use)
+
+Every Zodize product's back office previously started as a clone of one
+audited, production Laravel application (internally referred to during
+audit as "ViserBank/ViserLab Core Engine v3.0", sourced from
+`/home/qfsfountains/public_html`), with four alternate-base exceptions
+(ZodiBank on Pay Secure, ZodiCore on Ultimate POS, and ZodiCapital/
+ZodiYield originally on novavest — see `BUILD_STATE.md`). qfsfountains and
+novavest are both retired now, per the decision recorded above. **ZodiCore
+and ZodiBank are explicitly left on their current bases (Ultimate POS, Pay
+Secure) for now** — migrating them onto ZodiAdmin is planned but
+deliberately deferred until every other product is built, as a dedicated
+conversion pass. Do not start that migration or make changes in
+anticipation of it.
 
 ## Directory structure
 
@@ -149,6 +222,35 @@ built against the product's own
 modules consume the inherited engine's services (wallet, notifications,
 RBAC, settings) the same way any other application code does — they never
 fork or duplicate an inherited controller/model to add domain behavior.
+
+## Template system: one templating method, one template per product
+
+ZodiAdmin inherits its predecessor's multi-template system as-is —
+front-facing templates live under `resources/views/templates/<name>/`
+(pages, sections, layouts, a `sections.json` manifest, a `preview.jpg`
+thumbnail) with matching static assets under
+`assets/templates/<name>/` (CSS/JS, including a `css/color.php` script
+that generates the template's stylesheet dynamically from
+`general_settings.base_color`/`secondary_color` — no code change needed
+to retheme a template's accent color, only an admin-configurable hex
+value). The admin's Templates page (`admin.frontend.templates`) lists
+every folder under `resources/views/templates/`, lets an admin pick the
+active one (`general_settings.active_template`), and — per this decision —
+is the **only** installation path: the vendor's original marketplace
+upload/download flow (which called out to `license.viserlab.com` to
+verify and deliver purchased templates) was removed as part of the
+license-gate cleanup and is not replaced. New templates are added by
+copying a folder, not by a purchase flow.
+
+**Every future product gets its own dedicated template** under this same
+system, following the pattern ViserLab's own product line used: copy the
+`zodize` template folder (ZodiAdmin's own default, Inter + Zodize brand
+indigo) to `resources/views/templates/<product-slug>/` and
+`assets/templates/<product-slug>/`, then customize copy/imagery/sections
+for that product's own market — never fork the underlying Blade
+structure or the `color.php` mechanism itself. This keeps every product's
+frontend on one consistent templating method, so building the next
+product's template is a content pass, not a system rebuild.
 
 ## Mandatory isolation before touching any live reference codebase
 
