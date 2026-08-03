@@ -290,6 +290,106 @@ created it. **Per that same instruction, this is the only thing being
 held for a decision; the isolation fix in the next entry below proceeds
 immediately without waiting for this answer.**
 
+### 2026-08-03 — ZodiAdmin admin dashboard fully rebuilt (layout/component rebuild, not a restyle) on ZodiCapital; verified live (see commit `40c7772` on `zodicapital/core`)
+
+Full-focus task, all other product work (ZodiYield, ZodiBusiness, ROADMAP.md
+queue) explicitly paused per the requesting instruction. Scope: rebuild
+`/home/script/public_html/zodicapital/`'s admin dashboard into the
+permanent ZodiAdmin dashboard pattern every future product clones —
+real data, Zodize brand tokens, reorganized nav, responsive, light/dark
+mode. Documented as the new pattern in `base-codebase-strategy.md`
+("Admin dashboard pattern" section).
+
+- **Real data, no mock numbers.** New `App\Services\DashboardMetricsService`
+  backs every stat/chart/list with live Eloquent/DB queries against
+  `funds`/`investors`/`commitments`/`capital_calls`/`distributions`/
+  `capital_accounts`/`transactions`. Spot-checked 4 displayed numbers
+  directly against the DB (exceeds the required 3): Total Investments
+  ($1,000,000.00) = `SUM(commitments.committed_amount)` = DB value
+  1,000,000.00000000; Total Investors (1) = `investors` row count = 1;
+  Total Funds (1) = `funds` row count = 1; Aggregate ROI (-100%) =
+  `(distributed_to_date + current_nav - called_to_date) / called_to_date
+  * 100` computed from the single `capital_accounts` row
+  (called=200000.00000000, distributed=0, nav=0) = exactly -100%, matching
+  the dashboard's displayed value. This instance's fund-structure tables
+  are sparse (an early/seed state), so several cards read 0 or small
+  numbers — that is the accurate real state, not a bug; no value is
+  hardcoded anywhere in the new code.
+- **Layout rebuilt, not restyled**: welcome header, 5 real stat cards,
+  Investment Overview area chart + Investment Plan Distribution donut
+  chart, 3 secondary panels (Top Funds / ROI Performance / Investor
+  Growth), Recent Transactions table, Platform Statistics panel, Recent
+  Activities feed (merged from commitments/distributions/capital
+  calls/deposits/withdrawals, sorted by timestamp). Renamed labels to
+  ZodiCapital's real terminology where the reference's concept didn't
+  exist (e.g. "Total Portfolios" → "Total Funds").
+- **Every existing dashboard feature preserved**: the prior widgets
+  (user counts, deposit/withdrawal totals, login-by-browser/OS/country
+  charts) were kept in full, relocated under a "Platform Activity"
+  section divider beneath the new content — nothing dropped.
+- **Sidebar reorganized into 6 grouped headers** — Investments, Investors
+  & Referrals, Finance & Wallets, Reports & Analytics, Support, System &
+  Settings — via `sidenav.json`'s existing (previously unused) `"header"`
+  key mechanism. Verified live: `document.querySelectorAll('.sidebar__menu-header')`
+  returns exactly those 6 group labels in that order. Verified all 19
+  distinct routes across every group return HTTP 200 via an authenticated
+  in-browser `fetch()` sweep (resolved from `route($name)` in tinker, not
+  guessed paths) — includes the two required regression checks (Fund
+  Structures `/admin/fund` → 200, Settings `/admin/system-setting` → 200)
+  plus login (`/admin` unauthenticated → 200). Also linked the existing
+  Referrals admin page (`admin.referrals.index`) into the sidebar for the
+  first time — it had a working controller/route but no menu entry before
+  this pass.
+- **Light/dark mode**: real second palette (not an inverted filter) using
+  Zodize's brand tokens (navy `#0A1F44`, blue `#2F6BFF`, gold `#C9A24A`,
+  dark `#0B0B0C`, light `#F5F7FA`), toggle in the topbar, applied via a
+  render-blocking inline script in `<head>` reading `localStorage`
+  (default dark) to avoid a flash of the wrong theme. Verified live:
+  toggled dark→light, confirmed `zdz-stat-card` background/text/topbar
+  colors actually changed (not just a filter) via `getComputedStyle`;
+  reloaded the page and confirmed the theme and colors persisted
+  (`localStorage` value + computed styles both read back as `light`);
+  toggled back to dark and confirmed the reverse. ApexCharts instances
+  destroy/re-render on a `zdz-theme-changed` event so chart colors match
+  the active theme rather than just the background swapping.
+- **Responsive**: reused the already-existing off-canvas mobile sidebar
+  mechanism (`.sidebar.open`, present in the inherited `app.css`/`app.js`)
+  rather than rebuilding it; added dashboard-specific reflow rules at the
+  same breakpoints for the new stat cards/charts/activity strip.
+  **Caveat, stated plainly**: this session's Playwright tool wrapper has
+  no viewport-resize or device-emulation call, so true mobile/tablet
+  *viewport* screenshots could not be captured this pass — verification
+  for that requirement relied on the CSS media queries and Bootstrap 5's
+  standard grid breakpoints (already used throughout, e.g. `col-sm-6`/
+  `col-lg-4`/`col-xl-8`) plus confirming the pre-existing off-canvas
+  toggle mechanism is real and functioning, not on an actual narrow-
+  viewport screenshot. Flagging this rather than claiming a screenshot
+  that doesn't exist.
+- **Real bug found and fixed along the way**: `assets/admin/js/vendor/`
+  had no `apexcharts.min.js` at all — confirmed via a direct curl 404 on
+  the asset URL before the fix. This meant the dashboard's new charts
+  came up blank (`typeof ApexCharts === 'undefined'`), and so had the
+  *inherited* deposit/withdrawal and transaction charts on the old
+  dashboard, silently, before this pass touched anything. Fetched a
+  legitimate ApexCharts v3.54.1 build via CDN into that path; verified
+  live afterward that all 5 chart containers (`investmentOverviewChart`,
+  `fundAllocationChart`, `investorGrowthChart`, plus the legacy
+  `dwChartArea`/`transactionChartArea`) now contain a real rendered
+  `<svg>`.
+- **Regression check**: `storage/logs/laravel.log` inspected after all
+  verification traffic — the only new entry from this pass was a self-
+  caused CLI flag typo (`artisan route:list --columns`, harmless, no
+  page request involved); every other recent entry predates this pass
+  (stale novavest/qfsfountains and already-fixed earlier-session errors).
+  Admin login confirmed working (`/admin`, unauthenticated → 200).
+- Not done this pass, intentionally out of scope: DB-backed admin-profile
+  theme preference (localStorage alone satisfies "persisted across page
+  loads" as instructed); true responsive-viewport screenshots (see
+  caveat above).
+- Committed as `40c7772` on `zodicapital/core` (VPS git repo). Stopping
+  per the requesting instruction — not resuming ZodiYield/ZodiBusiness/
+  ROADMAP.md until given the go-ahead.
+
 ### 2026-08-03 — Six real defects found by direct live-site inspection after the ZodiAdmin pass was reported done; all six fixed and verified live this pass (see commit `5b9922d` on `zodicapital/core`)
 
 The ZodiAdmin transformation recorded in the entry below was reported
