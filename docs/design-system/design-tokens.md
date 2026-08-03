@@ -2,7 +2,8 @@
 
 This document is the consolidated reference for every design token used
 across the Zodize design system, and the single place that defines how a
-token's name maps to its implementation in the Laravel + Vue stack. Every
+token's name maps to its implementation in the Laravel + Blade + Bootstrap 5
+stack. Every
 other document in `docs/design-system/` defines the *values*; this document
 defines the **naming convention and the delivery mechanism**.
 

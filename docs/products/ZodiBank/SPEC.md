@@ -273,9 +273,9 @@ configures (§22), plus the Fincra integration documented in
 
 ## 12. Technology
 
-Laravel (PHP) + Vue per
+Laravel (PHP) + Blade + Bootstrap 5 + jQuery per
 [coding-standards-php-laravel.md](../../development/coding-standards-php-laravel.md)
-and [coding-standards-vue.md](../../development/coding-standards-vue.md);
+and [coding-standards-laravel-frontend.md](../../development/coding-standards-laravel-frontend.md);
 PostgreSQL (ledger tables use append-only, indexed-by-account-and-date
 partitioning) + Redis per
 [database-standards.md](../../development/database-standards.md); card

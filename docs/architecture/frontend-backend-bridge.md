@@ -16,7 +16,7 @@ Zodize has two audited codebases, and today they do not talk to each other:
    already works for the base engine's own native Blade views.
 2. **The Zodize marketing frontend shell** (`/home/zodize/public_html`) has
    the real, implemented design system every product's public pages must
-   use — Tailwind v4 tokens matching
+   use — Bootstrap 5 + Zodize-theme tokens matching
    [`../design-system/`](../design-system/), and a library of reusable Blade
    components at `resources/views/components/zodize/`, namespaced
    `x-zodize.*`. **Verified correction**: a direct filesystem audit of this
@@ -108,7 +108,7 @@ sequenceDiagram
 6. **Non-CMS pages stay code-defined.** Application pages that are not
    marketing content (the authenticated dashboard, admin panel itself,
    transactional flows) are NOT run through this bridge — they continue to
-   be built as ordinary Blade/Vue views per
+   be built as ordinary Blade views per
    [`../standards/`](../standards/) and
    [`../templates/dashboard-template.md`](../templates/dashboard-template.md).
    The bridge applies specifically to the public marketing site scope

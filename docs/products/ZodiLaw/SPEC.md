@@ -215,8 +215,8 @@ merely logically isolated rows in one shared database.
 
 Laravel 11 + PHP ^8.3 per the inherited base codebase
 ([coding-standards-php-laravel.md](../../development/coding-standards-php-laravel.md)),
-with Blade/Vue for new module UI per
-[coding-standards-vue.md](../../development/coding-standards-vue.md);
+with Blade + Bootstrap 5 + jQuery for new module UI per
+[coding-standards-laravel-frontend.md](../../development/coding-standards-laravel-frontend.md);
 MySQL/MariaDB per the base codebase's inherited schema, matching
 [database-standards.md](../../development/database-standards.md); document
 storage with full version history per this deployment's own storage

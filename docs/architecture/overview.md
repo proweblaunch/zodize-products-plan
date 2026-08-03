@@ -92,7 +92,7 @@ debt is fixed once in the base before the first product clones it.
 
 Every product's public-facing marketing site starts as a clone of the
 Zodize design-system frontend shell (internally derived from what shipped at
-`/home/zodize/public_html`) — a Tailwind v4 + Blade component library
+`/home/zodize/public_html`) — a Bootstrap 5 + Blade component library
 already matching [`../design-system/`](../design-system/). That frontend is
 currently static and disconnected from the base codebase's CMS; wiring it up
 is a documented, scoped task, not an assumption — see
