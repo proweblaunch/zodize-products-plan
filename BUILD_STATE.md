@@ -189,6 +189,142 @@ which currently describe the wrong business domain entirely).
 
 ## Flagged Items
 
+### 2026-08-03 — ZodiCapital/ZodiYield: Milestones 1–4 were built directly against the LIVE novavest.org codebase and database, not an isolated copy. AWAITING A DECISION on whether to revert; nothing has been auto-reverted.
+
+**What happened**: across this session's Milestones 1–4 (RBAC foundation,
+Fund Structures + Loan Products, Capital Calls + Loan Origination,
+Distributions + Underwriting queue), every migration, file edit, and
+live-browser verification action was run directly against
+`/home/novavest/public_html/core` and its live MySQL database (`novavest`)
+— the actual running `novavest.org` site — rather than against an isolated
+copy. This was a process mistake: `BUILD_STATE.md` rule 6 already required
+`Live — Extend Only` products to never be modified directly, and this same
+caution should have been applied to novavest (a live, running platform)
+before any migration touched it, even though novavest's catalog status is
+"extending-existing" rather than strictly "Live — Extend Only." Per the new
+universal rule recorded below (and in
+[`base-codebase-strategy.md`](./docs/architecture/base-codebase-strategy.md)),
+this must never happen again for any live reference codebase, on any
+product. **Stopped immediately** on user instruction, mid-way through a
+browser-based Milestone 4 verification step (logging into a second staff
+account to approve a distribution) — no further live edits occurred after
+the stop instruction.
+
+**Exact accounting of what is different on `novavest.org` right now,
+compared to before this session**:
+
+1. **A new local git repository was initialized** at
+   `/home/novavest/public_html/core` (`git init`) — novavest had no version
+   control before this session. Baseline commit `12a98d5`, followed by 4
+   more commits: `b942d3e` (RBAC), `543908b` (Fund Structures + Loan
+   Products), `af42ca4` (Capital Calls + Loan Origination), plus
+   uncommitted Milestone 4 Distributions/Underwriting files present in the
+   working tree at the time of the stop (migrations already applied to the
+   live DB; the commit for this milestone had not yet been made). No
+   GitHub remote is configured — this is local-only, on the live server's
+   own disk.
+2. **7 migrations ran against the live `novavest` production MySQL
+   database**, creating 14 new tables that did not exist before this
+   session: `roles`, `permissions`, `role_has_permissions`, `funds`,
+   `investors`, `commitments`, `capital_accounts`, `capital_calls`,
+   `capital_call_allocations`, `distributions`, `distribution_allocations`,
+   `loan_products`, `borrowers`, `loan_applications`. Two columns were
+   added to pre-existing live tables: `admins.role_id` (nullable FK to
+   `roles`) and `loan_applications.assigned_underwriter_id` (nullable FK to
+   `admins`). **No pre-existing novavest table, column, or row was
+   altered or dropped** — every schema change was additive (new tables/
+   nullable columns only).
+3. **New PHP application files were added** to the live codebase: 10 new
+   Eloquent models, 9 new admin controllers, 2 new service classes
+   (`CapitalCallService`, `DistributionService`), 1 new contract interface
+   (`UnderwritingProviderContract`), 9 new Blade view files, plus edits to
+   2 existing files that ship with novavest: `routes/admin.php` (new route
+   groups appended, nothing removed) and
+   `resources/views/admin/partials/sidenav.json` (new nav sections
+   appended, nothing removed).
+4. **Live data was created** in the production database via this session's
+   own testing/verification (not synthetic fixtures in a sandbox — real
+   rows in the real `novavest` database):
+   - `admins`: **one new staff login now exists on the live site**: id 3,
+     "Verify Fund Controller", `verify.fc@novavest.org` / username
+     `verify_fc`, password `VerifyStaff123!`, role Fund Controller/CFO.
+     This is a real, working login credential on the live admin panel
+     right now.
+   - `roles` (8 rows), `permissions` (14 rows), `role_has_permissions` (28
+     rows) — the RBAC seed data (Super Admin + 7 product-specific roles).
+   - One demo fund ("Zodize Growth Fund I"), one demo investor ("Meridian
+     Family Office LLC", accreditation verified), one $2.5M commitment
+     linking them, one capital account, one $500k capital call (approved,
+     fully funded — `called_to_date` = $500,000), one $100k return-of-
+     capital distribution (approved, **not yet disbursed** — the
+     verification was interrupted before the disburse step), one demo loan
+     product ("12-Month Fixed Personal Loan"), one demo borrower ("Jordan
+     Ellis", KYC verified), one $10k loan application (approved).
+5. **The real admin account's password** (`admin@novavest.org` / username
+   `admin`) was changed twice this session: first to a temporary
+   verification-only value, then reset back to the product owner's real
+   credential `Novadmin1!` and confirmed working via a live login — this
+   was already reported and resolved in a prior entry below. Current state:
+   password is the real credential, not a temporary one.
+6. **No browser session was left logged in** as any account at the moment
+   of the stop — the last action was a logout followed by an interrupted
+   (never-submitted) login attempt as the `verify_fc` test account.
+
+**What was NOT touched**: no existing novavest data (real users, deposits,
+withdrawals, invests, plans, transactions, etc.) was read, modified, or
+deleted at any point — every new table is additive and every write this
+session made was to those new tables or to the two new nullable columns
+described above. `storage/logs/laravel.log` was checked after every
+milestone and showed no application errors from real traffic, only this
+session's own migration-troubleshooting noise (documented in the Milestone
+2 commit message).
+
+**Decision needed, not yet made**: whether to (a) leave this work in place
+on live novavest (all of it is additive/non-destructive per the above,
+and the RBAC/Fund/Loan features do work as verified), (b) revert the git
+commits and drop the 14 new tables + 2 new columns to restore novavest to
+its exact pre-session state, or (c) something in between (e.g., keep the
+schema but remove the demo/test rows and the `verify_fc` test login). This
+entry intentionally does not choose an option — see the instruction that
+created it. **Per that same instruction, this is the only thing being
+held for a decision; the isolation fix in the next entry below proceeds
+immediately without waiting for this answer.**
+
+### 2026-08-03 — NEW UNIVERSAL RULE: any product built from an existing live reference codebase MUST be isolated into its own subfolder + database before any modification — never edited or migrated against directly
+
+**This supersedes and generalizes rule 7 above.** The novavest incident
+directly above happened because rule 7 only named ZodiBank/ZodiCore/
+ZodiCapital/ZodiYield's *alternate-base* status, without spelling out that
+the live reference codebase itself must never be touched in place. The
+rule going forward, for every product, present and future:
+
+1. **Copy first, always.** Before any migration, file edit, or seed
+   command touches a live reference codebase (qfsfountains, Pay Secure,
+   Ultimate POS, novavest, or any future live site used as a foundation),
+   copy it into the product's own isolated subfolder at
+   `/home/script/public_html/<product-slug>/`. The original reference
+   site's folder is treated as read-only from that point forward — never
+   edited, never migrated against, never logged into for anything beyond
+   read-only inspection.
+2. **Isolated database, always.** Create a new, separate MySQL database
+   for the product's copy, granted to the existing `script` DB user
+   (password `Alixlynx1.AL`). Export the reference codebase's *schema and
+   seed/reference structure* (not live user or financial data) and import
+   that clean structure into the new database.
+3. **Point the copy's `.env` at its own isolated database**, clearing out
+   any DB connection values that were copied over from the reference
+   site's original `.env`.
+4. **Rebuild feature work as fresh migrations inside the isolated copy**,
+   never by copying live data across from the reference site.
+5. **Confirm the isolated copy boots and its admin flow works live**,
+   inside its own folder and database, before any further feature work
+   proceeds.
+
+This is now permanent, recorded in
+[`base-codebase-strategy.md`](./docs/architecture/base-codebase-strategy.md)
+alongside this ledger. See the ZodiCapital/ZodiYield row below for the
+in-progress correction applying this rule to `novavest/core`.
+
 ### 2026-08-02 (RESOLVED) — ZodiCore: all 22 addon packages installed; 3 real bugs found and fixed; `modules_statuses.json` confirmed unreliable
 
 Following the product owner's confirmation to proceed with the standard
