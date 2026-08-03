@@ -290,6 +290,109 @@ created it. **Per that same instruction, this is the only thing being
 held for a decision; the isolation fix in the next entry below proceeds
 immediately without waiting for this answer.**
 
+### 2026-08-03 — Six real defects found by direct live-site inspection after the ZodiAdmin pass was reported done; all six fixed and verified live this pass (see commit `5b9922d` on `zodicapital/core`)
+
+The ZodiAdmin transformation recorded in the entry below was reported
+"verified live" but a direct visit to the actual site found it was not.
+Six concrete problems, found by visiting the live URLs directly rather
+than trusting the prior pass's claims, all now fixed and re-verified:
+
+1. **Homepage sections were blank.** Root cause: this app splits
+   page-builder config across two tables — `frontends` (section content,
+   scoped by `tempname`) and a separate `pages` table (per-page enabled-
+   section list, scoped by `tempname` in a different format, e.g.
+   `'templates.zodize.'` vs `frontends`' plain `'zodize'`). The earlier
+   pass cloned `frontends` content from `hyip_gold` to `zodize` but never
+   cloned the matching `pages` rows, so `SiteController@index`'s
+   `Page::where('tempname', activeTemplate())->where('slug', '/')->first()`
+   returned null and every section's `@if ($sections && $sections->secs
+   != null)` check failed — the homepage rendered only the parts outside
+   that loop. Fixed by cloning all 5 `hyip_gold`-scoped `pages` rows
+   (home, blogs, faqs, about, plans) to `zodize` scope. **Proof**: homepage
+   `document.body.innerText.length` went from 1105 chars (broken) to 4107
+   chars (fixed) with real Mission/Vision/Why-Choose-Us/How-It-Works/
+   Affiliate-Program/Plan-calculator content, confirmed via live browser
+   navigation before and after. Also found the Plans page had zero actual
+   plan products (a different, empty-seed-data problem) — created 2 real
+   plans through the live Add Plan admin form and confirmed them
+   rendering on the public `/plan` page.
+2. **Link audit.** Extracted every rendered `<a href>` on the homepage,
+   about, contact, and blogs pages via live DOM queries and cross-checked
+   against the admin-configured values (banner `button_link`, social
+   icon URLs, policy-page slugs, contact `support_email`) directly in the
+   database — all matched. `curl` load-tested all 14 public routes to
+   confirm 200s. Found and fixed one real, live mismatch the systematic
+   pass surfaced: a demo blog post's slug was still literally
+   `hyip-investments-is-mega-typically-policy` (an indexable, branded
+   URL) — renamed to `the-evolution-of-staking-and-staking-pools`
+   matching its actual (already-clean) content, confirmed the new URL
+   resolves and the old broken reference is gone from the blog listing.
+3. **Real admin UI redesign**, not a font swap. Rewrote
+   `assets/admin/css/zodize-theme.css` to restyle actual chrome: sidebar
+   flat navy (`#071251`) → near-black vertical gradient with a bordered
+   edge; topbar given a visually distinct shade + bottom border (it was
+   previously the exact same color as the sidebar — no chrome
+   hierarchy at all); active sidebar item changed from a solid color
+   block to a left accent bar + tinted gradient overlay; card corner
+   radius 5px → 10px with a softer shadow; table headers redesigned
+   (uppercase, letter-spaced, tinted background); badges made pill-
+   shaped. **Proof**: verified via live computed-style assertions
+   (`getComputedStyle` on the actual rendered sidebar/topbar/card/active-
+   nav-item elements) confirming the new gradient, border colors, and
+   radius values are actually applied in the browser, not just present
+   in the CSS file. A real CSS-caching bug was found and fixed in the
+   process: the stylesheet `<link>` had no cache-busting version, so the
+   browser kept serving a stale cached copy after edits — fixed by
+   appending `?v={{ filemtime(...) }}` to the asset URL.
+4/5. **Two additional branding leaks the prior pass missed**, found on
+   `admin/system/info`: a separate hardcoded "ViserAdmin Version" field
+   (distinct from the `systemDetails()['name']` string already fixed
+   previously) — removed entirely. Both `system/info.blade.php` and the
+   sidebar version-footer (`sidenav.blade.php`) literally rendered
+   "ZodiAdmin"/"ZODIADMIN" as visible text — both now read
+   `gs('site_name')` (= "ZodiCapital" for this instance) instead of the
+   internal base-pattern identifier, which per the instruction that
+   created ZodiAdmin should never appear as literal user-visible
+   branding. Also fixed `general_settings.site_name` itself (was
+   "ZodiAdmin", now "ZodiCapital"), `sms_from`, `email_from`/
+   `email_from_name`, the email template's hardcoded `novavest.org` logo
+   URL, and the live SMTP `mail_config` — it had a real, working
+   `support@novavest.org` mailbox password wired in, cleared rather than
+   left pointing at an unrelated foreign account. Ran a full
+   repo-wide grep **and** a full database sweep (every varchar/text/
+   longtext column across all 57 tables, via a tinker script checking
+   every column, not just the ones touched by hand) for
+   `viser|hyiplab|novavest` — both now return zero matches except one
+   historical code comment. Also found and deleted a dead ViserLab "Easy
+   Installer" CSS asset with no code referencing it (a leftover, not
+   reachable, but still branded cruft).
+6. **Deleted every template except zodize entirely** (`bit_gold`,
+   `hyip_gold`, `invester`, `neo_dark`) — Blade views, static asset
+   folders, and their `frontends`/`pages` database rows, not just added
+   `zodize` alongside them as the prior pass had. **Proof**: the live
+   Templates page now lists exactly one template ("Zodize"), correctly
+   marked SELECTED. Fixed a real, pre-existing bug in
+   `FrontendController::templates()` while doing this: it built preview-
+   thumbnail URLs from `core/resources/views/templates/*`, a path that
+   returns HTTP 403 (`core/` is correctly not web-accessible in this
+   app's `assets/`+`core/` split) — every template's thumbnail was
+   broken by this bug, not just the new one. Fixed to serve from
+   `assets/templates/<name>/preview.jpg` instead, and replaced the
+   inherited (irrelevant) preview image with a real screenshot of the
+   actual live Zodize-themed homepage, confirmed loading (`naturalWidth >
+   0`) in the live DOM.
+
+Also renamed the `ViserForm` Blade component (used by the KYC, manual-
+payment, and withdrawal-preview forms) to `ZodiForm` as a proper refactor
+— class file, the `<x-zodi-form>` tag in the `zodize` template, and the
+component's own view file all renamed together — confirmed no broken
+references remain anywhere in the codebase.
+
+Every item above was fixed, then independently re-verified live in a
+real browser session against `https://script.zodize.com/zodicapital/`
+(both admin and public sides) before moving to the next item, per
+explicit instruction not to report this pass done without that proof.
+
 ### 2026-08-03 (RESOLVED by product-owner decision) — Strategic pivot: novavest/qfsfountains retired as bases; ZodiCapital becomes ZodiAdmin, the one shared Zodize base; license gate removed cleanly (not bypassed); licensing itself deferred to a dedicated final pass
 
 **Resolution to the CRITICAL entry immediately below**: the product owner
