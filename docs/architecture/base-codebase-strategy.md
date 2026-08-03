@@ -252,6 +252,86 @@ structure or the `color.php` mechanism itself. This keeps every product's
 frontend on one consistent templating method, so building the next
 product's template is a content pass, not a system rebuild.
 
+## Admin dashboard pattern (rebuilt 2026-08-03, ZodiCapital)
+
+The dashboard every product inherits from ZodiAdmin was rebuilt from a
+generic-HYIP widget grid into a real fund/investment-operations dashboard,
+and the pattern below — not the ZodiCapital-specific metrics — is what
+future products should clone.
+
+**Data layer.** A dedicated `App\Services\DashboardMetricsService` backs
+every widget with real Eloquent/DB queries against the product's actual
+schema — no hardcoded numbers anywhere. For ZodiCapital that means
+`funds`/`investors`/`commitments`/`capital_calls`/`distributions`/
+`capital_accounts`; a future product's service class queries whatever its
+own domain tables are. Each metric is its own method (`totalInvestments()`,
+`aggregateRoiPercent()`, `investmentOverviewSeries()`,
+`fundAllocationBreakdown()`, `topFunds()`, `roiPerformance()`,
+`investorGrowth()`, `recentTransactions()`, `platformStatistics()`,
+`recentActivities()`), injected into the dashboard controller method —
+easy to re-target per product without touching the view.
+
+**Layout.** Welcome header (admin name + date + quick pill stats) → 5 stat
+cards → a 2-column chart row (area chart for a time-series overview,
+donut for a categorical breakdown) → 3 secondary panels (a ranked list, a
+performance list, a small trend chart) → a recent-transactions table
+alongside a platform-statistics mini-list → a full-width recent-activity
+feed merged from multiple event sources and sorted by timestamp. Rename
+every label to the product's real terminology (ZodiCapital's "Total
+Portfolios" became "Total Funds" since the fund-structure schema has no
+portfolio concept) rather than forcing a mismatched label onto whatever
+data exists.
+
+**Never drop existing widgets when rebuilding a dashboard** — the prior
+dashboard's content (deposit/withdrawal totals, login-by-browser/OS/
+country charts) was kept in full, relocated under a `zdz-section-divider`
+labeled "Platform Activity" beneath the new fund-operations section, so
+the rebuild is additive to what admins already relied on, not a
+replacement that silently drops functionality.
+
+**Sidebar grouping.** `resources/views/admin/partials/sidenav.json` items
+can carry a `"header"` key that renders a `sidebar__menu-header` label
+immediately before that item — group related menu entries by giving the
+*first* entry of each logical group a `"header"` value (e.g. `"header":
+"Investments"` on the Fund Structures entry groups it with Loan Products,
+Staking, Pool, and Investment Report underneath one label). Reordering the
+JSON's key order changes the rendered order; nothing needs to move to a
+different file. Every existing `route_name` must still resolve — verify
+with `route($name)` in tinker for every entry touched, not by eyeballing
+the JSON.
+
+**Theme tokens and light/dark mode.** CSS custom properties scoped to
+`:root[data-zdz-theme="dark"]` / `:root[data-zdz-theme="light"]` on
+`<html>`, both palettes built from Zodize's actual brand tokens (navy
+`#0A1F44`, blue `#2F6BFF`, gold `#C9A24A`, dark `#0B0B0C`, light `#F5F7FA`,
+Inter) — never an inverted filter over one palette. The active theme is
+set by an inline, render-blocking script in `<head>` (reads
+`localStorage`, defaults to dark) so there's no flash of the wrong theme,
+and a toggle button in the topbar flips the attribute, persists to
+`localStorage`, and dispatches a `zdz-theme-changed` window event so
+ApexCharts instances can destroy/re-render with theme-correct colors
+rather than just swapping a background behind stale-colored chart lines.
+The sidebar keeps its navy brand gradient in both modes by design (that's
+the product's identity color, not a light/dark *surface*) — everything
+else (topbar, cards, tables) has a distinct value in each palette.
+
+**Responsive.** The off-canvas mobile sidebar (`.sidebar.open`,
+triggered by `.res-sidebar-open-btn` / `.res-sidebar-close-btn`) already
+existed in the inherited `app.css`/`app.js` — don't rebuild it, just add
+dashboard-specific reflow rules at the same breakpoints
+(1199.98/991.98/767.98/575.98px) for the new stat cards, chart cards, and
+activity strip.
+
+**A dependency gap this rebuild uncovered:** `assets/admin/js/vendor/`
+had no `apexcharts.min.js` at all in ZodiAdmin, which meant the
+*inherited* deposit/withdrawal and transaction charts on the old
+dashboard were silently broken (blank chart areas, no console-visible
+error) before this rebuild too. A legitimate ApexCharts build was fetched
+into that path as part of this fix. Check for this file when cloning
+ZodiAdmin for a new product — it won't be caught by a visual glance at
+the dashboard unless the chart containers are inspected for an actual
+rendered `<svg>`.
+
 ## Mandatory isolation before touching any live reference codebase
 
 **This rule is universal and non-negotiable, for every product, present or
